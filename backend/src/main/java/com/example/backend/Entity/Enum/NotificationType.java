@@ -1,0 +1,4 @@
+package com.example.backend.Entity.Enum;
+
+public enum NotificationType {
+}
