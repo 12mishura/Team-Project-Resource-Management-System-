@@ -1,10 +1,10 @@
 package com.example.backend.mapper;
 
-import com.example.backend.DTO.UserResponse;
-import com.example.backend.DTO.UserUpdateRequest;
-import com.example.backend.Entity.Enum.OrgRole;
-import com.example.backend.Entity.Organization;
-import com.example.backend.Entity.User;
+import com.example.backend.dto.UserResponse;
+import com.example.backend.dto.UserUpdateRequest;
+import com.example.backend.entity.enums.OrgRole;
+import com.example.backend.entity.Organization;
+import com.example.backend.entity.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;

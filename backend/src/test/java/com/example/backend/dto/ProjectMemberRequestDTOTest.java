@@ -14,7 +14,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ProjectMemberRequestDTOTest {
+class ProjectMemberRequestTest {
 
     private static ValidatorFactory factory;
     private static Validator validator;
@@ -32,16 +32,16 @@ class ProjectMemberRequestDTOTest {
 
     @Test
     void validRequest_hasNoViolations() {
-        var dto = new ProjectMemberRequestDTO(1, 2, ProjectRole.MEMBER);
+        var dto = new ProjectMemberRequest(1, 2, ProjectRole.MEMBER);
 
         assertTrue(validator.validate(dto).isEmpty());
     }
 
     @Test
     void nullUserId_isRejected() {
-        var dto = new ProjectMemberRequestDTO(null, 2, ProjectRole.MEMBER);
+        var dto = new ProjectMemberRequest(null, 2, ProjectRole.MEMBER);
 
-        Set<ConstraintViolation<ProjectMemberRequestDTO>> violations = validator.validate(dto);
+        Set<ConstraintViolation<ProjectMemberRequest>> violations = validator.validate(dto);
 
         assertEquals(1, violations.size());
         assertEquals("userId", violations.iterator().next().getPropertyPath().toString());
@@ -49,21 +49,21 @@ class ProjectMemberRequestDTOTest {
 
     @Test
     void nullProjectId_isRejected() {
-        var dto = new ProjectMemberRequestDTO(1, null, ProjectRole.MEMBER);
+        var dto = new ProjectMemberRequest(1, null, ProjectRole.MEMBER);
 
         assertEquals(1, validator.validate(dto).size());
     }
 
     @Test
     void nullRole_isRejected() {
-        var dto = new ProjectMemberRequestDTO(1, 2, null);
+        var dto = new ProjectMemberRequest(1, 2, null);
 
         assertEquals(1, validator.validate(dto).size());
     }
 
     @Test
     void allFieldsNull_producesThreeViolations() {
-        var dto = new ProjectMemberRequestDTO(null, null, null);
+        var dto = new ProjectMemberRequest(null, null, null);
 
         assertEquals(3, validator.validate(dto).size());
     }

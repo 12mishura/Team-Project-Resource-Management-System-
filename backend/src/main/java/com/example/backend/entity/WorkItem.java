@@ -1,8 +1,8 @@
-package com.example.backend.Entity;
+package com.example.backend.entity;
 
-import com.example.backend.Entity.Enum.WorkItemPriority;
-import com.example.backend.Entity.Enum.WorkItemStatus;
-import com.example.backend.Entity.Enum.WorkItemType;
+import com.example.backend.entity.enums.WorkItemPriority;
+import com.example.backend.entity.enums.WorkItemStatus;
+import com.example.backend.entity.enums.WorkItemType;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

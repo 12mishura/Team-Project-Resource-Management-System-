@@ -1,6 +1,6 @@
-package com.example.backend.Entity;
+package com.example.backend.entity;
 
-import com.example.backend.Entity.Enum.OrgRole;
+import com.example.backend.entity.enums.OrgRole;
 import jakarta.persistence.*;
 import lombok.*;
 

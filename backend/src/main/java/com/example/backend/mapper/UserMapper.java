@@ -1,8 +1,8 @@
 package com.example.backend.mapper;
 
-import com.example.backend.DTO.UserResponse;
-import com.example.backend.DTO.UserUpdateRequest;
-import com.example.backend.Entity.User;
+import com.example.backend.dto.UserResponse;
+import com.example.backend.dto.UserUpdateRequest;
+import com.example.backend.entity.User;
 import org.mapstruct.*;
 
 @Mapper(

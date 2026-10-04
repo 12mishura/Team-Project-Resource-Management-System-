@@ -1,8 +1,8 @@
-package com.example.backend.DTO;
+package com.example.backend.dto;
 
-import com.example.backend.Entity.Enum.WorkItemPriority;
-import com.example.backend.Entity.Enum.WorkItemStatus;
-import com.example.backend.Entity.Enum.WorkItemType;
+import com.example.backend.entity.enums.WorkItemPriority;
+import com.example.backend.entity.enums.WorkItemStatus;
+import com.example.backend.entity.enums.WorkItemType;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;

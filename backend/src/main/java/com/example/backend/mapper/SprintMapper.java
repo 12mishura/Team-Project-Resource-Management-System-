@@ -1,9 +1,9 @@
-package com.example.backend.Mapper;
+package com.example.backend.mapper;
 
-import com.example.backend.DTO.SprintRequest;
-import com.example.backend.DTO.SprintResponse;
-import com.example.backend.Entity.Enum.SprintPlan;
-import com.example.backend.Entity.Sprint;
+import com.example.backend.dto.SprintRequest;
+import com.example.backend.dto.SprintResponse;
+import com.example.backend.entity.enums.SprintPlan;
+import com.example.backend.entity.Sprint;
 import org.springframework.stereotype.Component;
 
 @Component

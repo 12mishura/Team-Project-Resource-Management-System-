@@ -1,11 +1,11 @@
-package com.example.backend.Mapper;
+package com.example.backend.mapper;
 
-import com.example.backend.DTO.WorkItemRequest;
-import com.example.backend.DTO.WorkItemResponse;
-import com.example.backend.Entity.Enum.WorkItemPriority;
-import com.example.backend.Entity.Enum.WorkItemStatus;
-import com.example.backend.Entity.Enum.WorkItemType;
-import com.example.backend.Entity.WorkItem;
+import com.example.backend.dto.WorkItemRequest;
+import com.example.backend.dto.WorkItemResponse;
+import com.example.backend.entity.enums.WorkItemPriority;
+import com.example.backend.entity.enums.WorkItemStatus;
+import com.example.backend.entity.enums.WorkItemType;
+import com.example.backend.entity.WorkItem;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;

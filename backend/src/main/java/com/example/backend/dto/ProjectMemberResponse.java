@@ -4,7 +4,7 @@ import com.example.backend.entity.enums.ProjectRole;
 
 import java.time.LocalDateTime;
 
-public record ProjectMemberResponseDTO(
+public record ProjectMemberResponse(
         Integer id,
         ProjectRole projectRole,
         LocalDateTime joinedAt,
