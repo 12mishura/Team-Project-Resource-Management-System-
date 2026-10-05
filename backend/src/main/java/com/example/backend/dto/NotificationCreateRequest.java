@@ -1,7 +1,7 @@
-package com.example.backend.DTO;
+package com.example.backend.dto;
 
-import com.example.backend.Entity.Enum.NotificationReferenceType;
-import com.example.backend.Entity.Enum.NotificationType;
+import com.example.backend.entity.enums.NotificationReferenceType;
+import com.example.backend.entity.enums.NotificationType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

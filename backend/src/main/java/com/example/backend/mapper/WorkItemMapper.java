@@ -1,8 +1,8 @@
-package com.example.backend.Mapper;
+package com.example.backend.mapper;
 
-import com.example.backend.DTO.WorkItemRequest;
-import com.example.backend.DTO.WorkItemResponse;
-import com.example.backend.Entity.WorkItem;
+import com.example.backend.dto.WorkItemRequest;
+import com.example.backend.dto.WorkItemResponse;
+import com.example.backend.entity.WorkItem;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

@@ -1,6 +1,6 @@
-package com.example.backend.DTO;
+package com.example.backend.dto;
 
-import com.example.backend.Entity.Enum.OrgRole;
+import com.example.backend.entity.enums.OrgRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 import lombok.*;

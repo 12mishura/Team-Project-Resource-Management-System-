@@ -1,7 +1,7 @@
 package com.example.backend.mapper;
 
-import com.example.backend.dto.ProjectMemberRequestDTO;
-import com.example.backend.dto.ProjectMemberResponseDTO;
+import com.example.backend.dto.ProjectMemberRequest;
+import com.example.backend.dto.ProjectMemberResponse;
 import com.example.backend.entity.Project;
 import com.example.backend.entity.ProjectMember;
 import com.example.backend.entity.User;
@@ -38,7 +38,7 @@ class ProjectMemberMapperTest {
 
     @Test
     void toDto_mapsAllFieldsIncludingNestedOnes() {
-        ProjectMemberResponseDTO dto = mapper.toDto(buildEntity());
+        ProjectMemberResponse dto = mapper.toDto(buildEntity());
 
         assertEquals(10, dto.id());
         assertEquals(ProjectRole.MANAGER, dto.projectRole());
@@ -56,7 +56,7 @@ class ProjectMemberMapperTest {
 
     @Test
     void toDtoList_mapsEveryElement() {
-        List<ProjectMemberResponseDTO> result =
+        List<ProjectMemberResponse> result =
                 mapper.toDtoList(List.of(buildEntity(), buildEntity()));
 
         assertEquals(2, result.size());
@@ -65,8 +65,8 @@ class ProjectMemberMapperTest {
 
     @Test
     void toEntity_mapsRoleAndLeavesRelationsAndGeneratedFieldsEmpty() {
-        ProjectMemberRequestDTO request =
-                new ProjectMemberRequestDTO(1, 2, ProjectRole.OWNER);
+        ProjectMemberRequest request =
+                new ProjectMemberRequest(1, 2, ProjectRole.OWNER);
 
         ProjectMember entity = mapper.toEntity(request);
 
@@ -80,8 +80,8 @@ class ProjectMemberMapperTest {
     @Test
     void updateEntity_changesRoleButKeepsIdentityAndRelations() {
         ProjectMember existing = buildEntity();
-        ProjectMemberRequestDTO request =
-                new ProjectMemberRequestDTO(99, 99, ProjectRole.MEMBER);
+        ProjectMemberRequest request =
+                new ProjectMemberRequest(99, 99, ProjectRole.MEMBER);
 
         mapper.updateEntity(request, existing);
 

@@ -1,6 +1,6 @@
-package com.example.backend.Entity;
+package com.example.backend.entity;
 
-import com.example.backend.Entity.Enum.SprintPlan;
+import com.example.backend.entity.enums.SprintPlan;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

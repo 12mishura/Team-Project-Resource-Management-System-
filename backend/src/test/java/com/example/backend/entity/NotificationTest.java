@@ -1,7 +1,7 @@
-package com.example.backend.Entity;
+package com.example.backend.entity;
 
-import com.example.backend.Entity.Enum.NotificationReferenceType;
-import com.example.backend.Entity.Enum.NotificationType;
+import com.example.backend.entity.enums.NotificationReferenceType;
+import com.example.backend.entity.enums.NotificationType;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;

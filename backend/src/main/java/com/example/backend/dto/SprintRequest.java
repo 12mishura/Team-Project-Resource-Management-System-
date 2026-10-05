@@ -1,6 +1,6 @@
-package com.example.backend.DTO;
+package com.example.backend.dto;
 
-import com.example.backend.Entity.Enum.SprintPlan;
+import com.example.backend.entity.enums.SprintPlan;
 import java.time.LocalDate;
 
 public record SprintRequest(

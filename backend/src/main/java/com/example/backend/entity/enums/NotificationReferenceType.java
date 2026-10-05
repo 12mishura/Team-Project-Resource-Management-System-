@@ -1,4 +1,4 @@
-package com.example.backend.Entity.Enum;
+package com.example.backend.entity.enums;
 
 public enum NotificationReferenceType {
     WORK_ITEM,

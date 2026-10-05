@@ -1,12 +1,12 @@
-package com.example.backend.Mapper;
+package com.example.backend.mapper;
 
-import com.example.backend.DTO.NotificationCreateRequest;
-import com.example.backend.DTO.NotificationResponse;
-import com.example.backend.Entity.Notification;
-import com.example.backend.Entity.User;
+import com.example.backend.dto.NotificationCreateRequest;
+import com.example.backend.dto.NotificationResponse;
+import com.example.backend.entity.Notification;
+import com.example.backend.entity.User;
 
-import com.example.backend.Entity.Enum.NotificationReferenceType;
-import com.example.backend.Entity.Enum.NotificationType;
+import com.example.backend.entity.enums.NotificationReferenceType;
+import com.example.backend.entity.enums.NotificationType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
