@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: tasktracker-postgres
+    environment:
+      POSTGRES_DB: tasktracker
+      POSTGRES_USER: tasktracker
+      POSTGRES_PASSWORD: tasktracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - tasktracker-data:/var/lib/postgresql/data
+
+volumes:
+  tasktracker-data:
