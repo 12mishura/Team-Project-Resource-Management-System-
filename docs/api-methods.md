@@ -1,0 +1,134 @@
+# TaskTracker — список методов API
+
+Обозначения:
+- ✅ — уже есть и покрыто тестами
+- 🔴 — не хватает, важно (без этого приложением неудобно или нельзя пользоваться)
+- 🟡 — не хватает, желательно
+- ⚪ — можно позже
+
+Доступ: **все** — без токена; **токен** — любой залогиненный; **участник** — член организации (OWNER/ADMIN/USER).
+
+Пути участников и проектов начинаются с `/organizations/{organizationId}`, ниже он сокращён до `/{orgId}`.
+
+---
+
+## 1. Аутентификация — `AuthController` / `AuthService`
+
+| | HTTP | Путь | Доступ | Метод сервиса |
+|---|---|---|---|---|
+| ✅ | POST | `/auth/register` | все | `register` |
+| ✅ | POST | `/auth/login` | все | `login` |
+| ✅ | GET | `/auth/me` | токен | `getCurrentUser` |
+| ✅ | POST | `/auth/refresh` | все (по refresh-токену) | `refresh` — новая пара токенов; старый refresh отзывается; повторное использование отозванного → отзыв всех сессий |
+| ✅ | POST | `/auth/logout` | все (по refresh-токену) | `logout` — отзывает refresh-токен, идемпотентно |
+
+Login и refresh возвращают `accessToken` (1 час), `refreshToken` (14 дней, в базе хранится только SHA-256 хеш), `expiresIn`, `refreshExpiresIn`.
+
+## 2. Профиль пользователя — `UserController` / `UserService`
+
+| | HTTP | Путь | Доступ | Что делает |
+|---|---|---|---|---|
+| ✅ | PATCH | `/users/me` | токен | `updateProfile` — смена `username` (уникален без учёта регистра) |
+| ✅ | PUT | `/users/me/password` | токен | `changePassword` — проверка текущего пароля; после смены все старые access- и refresh-токены перестают работать |
+| ✅ | GET | `/users/me/issues?type=&status=&parentId=&q=&sortBy=&direction=&page=&size=` | токен | `getMyIssues` — мои задачи по всем организациям |
+| ⚪ | DELETE | `/users/me` | токен | удаление аккаунта (сначала решить, что с организациями, где он OWNER) |
+
+## 3. Организации — `OrganizationController` / `OrganizationService`
+
+| | HTTP | Путь | Доступ | Метод сервиса |
+|---|---|---|---|---|
+| ✅ | POST | `/organizations` | токен → становится OWNER | `createOrganization` |
+| ✅ | GET | `/organizations?page=&size=` | токен | `getMyOrganizations` — мои организации, моя роль, `memberId`, дата вступления |
+| ✅ | GET | `/organizations/{id}` | участник | `getOrganizationById` |
+| ✅ | PATCH | `/organizations/{id}` | OWNER, ADMIN | `updateOrganization` |
+| ✅ | DELETE | `/organizations/{id}` | OWNER | `deleteOrganization` |
+| ✅ | GET | `/organizations/{id}/invite-code` | OWNER, ADMIN | `getInviteCode` |
+| ✅ | POST | `/organizations/{id}/invite-code/regenerate` | OWNER, ADMIN | `regenerateInviteCode` — старый код сразу перестаёт работать |
+| ✅ | POST | `/organizations/{id}/transfer-ownership` | OWNER | `transferOwnership` — новый владелец становится OWNER, старый ADMIN; в базе гарантирован ровно один OWNER |
+
+## 4. Участники — `OrganizationMemberController` / `OrganizationMemberService`
+
+| | HTTP | Путь | Доступ | Метод сервиса |
+|---|---|---|---|---|
+| ✅ | POST | `/organizations/join` | токен | `joinToOrganization` |
+| ✅ | GET | `/{orgId}/members?page=&size=` | участник | `getMembers` |
+| ✅ | PATCH | `/{orgId}/members/{memberId}` | OWNER, ADMIN + правила | `updateRole` |
+| ✅ | DELETE | `/{orgId}/members/{memberId}` | OWNER, ADMIN + правила | `removeMember` |
+| ✅ | DELETE | `/{orgId}/members/me` | любой, кроме OWNER | `leaveOrganization` |
+
+## 5. Проекты — `ProjectController` / `ProjectService`
+
+| | HTTP | Путь | Доступ | Метод сервиса |
+|---|---|---|---|---|
+| ✅ | POST | `/{orgId}/projects` | OWNER, ADMIN | `createProject` |
+| ✅ | GET | `/{orgId}/projects?status=&page=&size=` | участник | `getProjects` |
+| ✅ | GET | `/{orgId}/projects/{projectId}` | участник | `getProject` |
+| ✅ | PATCH | `/{orgId}/projects/{projectId}` | OWNER, ADMIN | `updateProject` |
+| ✅ | PATCH | `/{orgId}/projects/{projectId}/status` | OWNER, ADMIN | `changeStatus` |
+| ✅ | DELETE | `/{orgId}/projects/{projectId}` | OWNER | `deleteProject` |
+
+## 5.1. Участники проекта — `ProjectMemberController` / `ProjectMemberService`
+
+Путь: `/{orgId}/projects/{projectId}/members`. Роли в проекте: `ADMIN` / `EXTENDED` / `USER`. Добавить можно только участника этой же организации.
+
+| | HTTP | Путь | Доступ | Что делает |
+|---|---|---|---|---|
+| ✅ | POST | `/members` | OWNER, ADMIN организации | `addMember` |
+| ✅ | GET | `/members?page=&size=` | участник организации | `getMembers` |
+| ✅ | PATCH | `/members/{projectMemberId}` | OWNER, ADMIN | `updateRole` |
+| ✅ | DELETE | `/members/{projectMemberId}` | OWNER, ADMIN | `removeMember` |
+
+## 6. Задачи — `IssueController` / `IssueService`
+
+Путь: `/{orgId}/projects/{projectId}/issues`. Абстрактный `Issue` (SINGLE_TABLE) и наследники `Epic`, `Story` (`storyPoints`), `Task`, `Bug` (`severity`, `stepsToReproduce`). Только Epic может быть родителем; Epic не может иметь родителя.
+
+| | HTTP | Путь | Метод сервиса |
+|---|---|---|---|
+| ✅ | POST | `/issues` | `createIssue` — тип в поле `type`; `parentId` сразу при создании — только EXTENDED / ADMIN |
+| ✅ | GET | `/issues?type=&status=&assigneeId=&parentId=&q=&sortBy=&direction=&page=&size=` | `getIssues` — `q`: поиск по названию; `sortBy`: `CREATED_AT` / `UPDATED_AT` / `PRIORITY` / `STATUS`; `direction`: `ASC` / `DESC` |
+| ✅ | GET | `/issues/{issueId}` | `getIssue` |
+| ✅ | PATCH | `/issues/{issueId}` | `updateIssue` |
+| ✅ | PATCH | `/issues/{issueId}/status` | `changeStatus` — только по workflow (см. ниже) |
+| ✅ | PATCH | `/issues/{issueId}/assignee` | `assignIssue` — `projectMemberId` обязателен |
+| ✅ | DELETE | `/issues/{issueId}/assignee` | `unassignIssue` — снять исполнителя |
+| ✅ | PATCH | `/issues/{issueId}/parent` | `changeParent` — `parentId` обязателен |
+| ✅ | DELETE | `/issues/{issueId}/parent` | `detachFromEpic` — отвязать от Epic |
+| ✅ | DELETE | `/issues/{issueId}` | `deleteIssue` |
+| ✅ | GET | `/issues/{issueId}/history?page=&size=` | `getHistory` — CREATED, FIELD_CHANGED, STATUS_CHANGED, ASSIGNEE_CHANGED, PARENT_CHANGED со старым и новым значением и автором |
+
+## 6.1. Комментарии — `IssueCommentController` / `IssueCommentService`
+
+Путь: `/{orgId}/projects/{projectId}/issues/{issueId}/comments`.
+
+| | HTTP | Путь | Доступ | Метод сервиса |
+|---|---|---|---|---|
+| ✅ | POST | `/comments` | кто видит задачу | `addComment` |
+| ✅ | GET | `/comments?page=&size=` | кто видит задачу | `getComments` |
+| ✅ | PATCH | `/comments/{commentId}` | только автор | `editComment` — ставит `editedAt` |
+| ✅ | DELETE | `/comments/{commentId}` | автор или ADMIN проекта | `deleteComment` |
+
+**Эффективная роль в проекте:** OWNER / ADMIN организации = ADMIN в любом проекте; иначе роль участника проекта; участник организации вне проекта — 403.
+
+| Действие | USER | EXTENDED | ADMIN |
+|---|---|---|---|
+| смотреть задачи | ✅ | ✅ | ✅ |
+| создать Task / Story / Bug | ✅ | ✅ | ✅ |
+| создать Epic | ❌ | ✅ | ✅ |
+| редактировать | только свои | любые | любые |
+| менять статус | свои или где исполнитель | любые | любые |
+| назначать исполнителя | взять свободную / снять себя | любого из проекта | любого из проекта |
+| привязать к Epic (в т.ч. при создании) | ❌ | ✅ | ✅ |
+| удалить | только свои | только свои | любые |
+
+**Workflow статусов:** TODO → IN_PROGRESS; IN_PROGRESS → TODO или IN_REVIEW; IN_REVIEW → IN_PROGRESS или DONE; DONE → IN_PROGRESS (переоткрыть). Остальные переходы — 409.
+
+Архивный проект (`ARCHIVED`) — только чтение (409 на изменения).
+
+## 7. Общее
+
+| | Что | Зачем |
+|---|---|---|
+| ✅ | Пагинация: `PageResponse` (`content`, `page`, `size`, `totalElements`, `totalPages`), по умолчанию 20, максимум 100, порядок по дате создания | уже на всех списках; Issue подключить так же |
+| 🟡 | Логирование / аудит через AOP (`@Around`) | анализ: кто, что, сколько длилось, успех/отказ |
+| 🟡 | OpenAPI / Swagger UI (springdoc) | живая документация API, удобно показывать в портфолио |
+| ⚪ | CORS | понадобится, когда появится фронтенд на другом домене |
