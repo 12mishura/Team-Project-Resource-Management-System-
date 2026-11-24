@@ -94,7 +94,12 @@ class OrganizationControllerTest extends AbstractIntegrationTest {
 
     @Test
     void createWithShortTitleReturnsBadRequest() throws Exception {
-        create(ownerToken, "Short", null).andExpect(status().isBadRequest());
+        create(ownerToken, "ab", null).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createWithThreeLetterTitleSucceeds() throws Exception {
+        create(ownerToken, "Ops", null).andExpect(status().isCreated());
     }
 
     @Test
@@ -233,7 +238,7 @@ class OrganizationControllerTest extends AbstractIntegrationTest {
     @Test
     void updateWithShortTitleReturnsBadRequest() throws Exception {
         update(ownerToken, organizationId, """
-                {"title":"Short"}
+                {"title":"ab"}
                 """)
                 .andExpect(status().isBadRequest());
     }

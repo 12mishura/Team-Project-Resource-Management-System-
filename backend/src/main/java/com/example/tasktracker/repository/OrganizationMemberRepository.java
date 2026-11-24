@@ -31,4 +31,6 @@ public interface OrganizationMemberRepository extends JpaRepository<Organization
 
     @EntityGraph(attributePaths = "organization")
     Page<OrganizationMember> findAllByUserEmail(String email, Pageable pageable);
+
+    long countByOrganizationId(UUID organizationId);
 }

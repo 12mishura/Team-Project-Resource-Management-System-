@@ -5,7 +5,6 @@ import com.example.tasktracker.aop.OrganizationId;
 import com.example.tasktracker.domain.OrganizationMember;
 import com.example.tasktracker.domain.Project;
 import com.example.tasktracker.domain.ProjectMember;
-import com.example.tasktracker.domain.enums.OrganizationRole;
 import com.example.tasktracker.dto.request.CreateProjectMemberRequest;
 import com.example.tasktracker.dto.request.UpdateProjectMemberRequest;
 import com.example.tasktracker.dto.response.PageResponse;
@@ -18,6 +17,8 @@ import com.example.tasktracker.mapper.ProjectMemberMapper;
 import com.example.tasktracker.repository.OrganizationMemberRepository;
 import com.example.tasktracker.repository.ProjectMemberRepository;
 import com.example.tasktracker.repository.ProjectRepository;
+import com.example.tasktracker.security.ProjectActor;
+import com.example.tasktracker.security.ProjectPermissionChecker;
 import com.example.tasktracker.util.PageRequests;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -33,11 +34,14 @@ public class ProjectMemberService {
     private final ProjectMemberMapper projectMemberMapper;
     private final ProjectRepository projectRepository;
     private final OrganizationMemberRepository organizationMemberRepository;
+    private final ProjectPermissionChecker permissionChecker;
 
-    @OrganizationAccess(roles = {OrganizationRole.OWNER, OrganizationRole.ADMIN})
+    @OrganizationAccess
     @Transactional
-    public ProjectMemberResponse addMember(@OrganizationId UUID organizationId, UUID projectId, CreateProjectMemberRequest request){
+    public ProjectMemberResponse addMember(@OrganizationId UUID organizationId, UUID projectId, CreateProjectMemberRequest request,
+                                           String email){
         Project project = findProject(organizationId, projectId);
+        permissionChecker.requireProjectAdmin(organizationId, projectId, email);
         OrganizationMember organizationMember = organizationMemberRepository
                 .findByIdAndOrganizationId(request.organizationMemberId(), organizationId)
                 .orElseThrow(() -> new MemberNotFoundException(request.organizationMemberId()));
@@ -61,20 +65,25 @@ public class ProjectMemberService {
                 projectMemberMapper::toResponse);
     }
 
-    @OrganizationAccess(roles = {OrganizationRole.OWNER, OrganizationRole.ADMIN})
+    @OrganizationAccess
     @Transactional
     public ProjectMemberResponse updateRole(@OrganizationId UUID organizationId, UUID projectId, UUID projectMemberId,
-                                            UpdateProjectMemberRequest request){
+                                            UpdateProjectMemberRequest request, String email){
         ProjectMember member = findMember(organizationId, projectId, projectMemberId);
+        ProjectActor actor = permissionChecker.requireProjectAdmin(organizationId, projectId, email);
+        permissionChecker.checkCanChangeMembership(actor, member);
         member.changeRole(request.role());
         projectMemberRepository.flush();
         return projectMemberMapper.toResponse(member);
     }
 
-    @OrganizationAccess(roles = {OrganizationRole.OWNER, OrganizationRole.ADMIN})
+    @OrganizationAccess
     @Transactional
-    public void removeMember(@OrganizationId UUID organizationId, UUID projectId, UUID projectMemberId){
-        projectMemberRepository.delete(findMember(organizationId, projectId, projectMemberId));
+    public void removeMember(@OrganizationId UUID organizationId, UUID projectId, UUID projectMemberId, String email){
+        ProjectMember member = findMember(organizationId, projectId, projectMemberId);
+        ProjectActor actor = permissionChecker.requireProjectAdmin(organizationId, projectId, email);
+        permissionChecker.checkCanChangeMembership(actor, member);
+        projectMemberRepository.delete(member);
     }
 
     private Project findProject(UUID organizationId, UUID projectId){

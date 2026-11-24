@@ -13,4 +13,7 @@ import java.util.UUID;
 public interface IssueEventRepository extends JpaRepository<IssueEvent, UUID> {
     @EntityGraph(attributePaths = "actor")
     Page<IssueEvent> findAllByIssueId(UUID issueId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"actor", "issue"})
+    Page<IssueEvent> findAllByIssueProjectId(UUID projectId, Pageable pageable);
 }

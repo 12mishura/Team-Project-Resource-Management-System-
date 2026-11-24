@@ -101,7 +101,7 @@ class ProjectControllerTest extends AbstractIntegrationTest {
 
     @Test
     void createWithInvalidTitleReturnsBadRequest() throws Exception {
-        create(ownerToken, titleBody("Short")).andExpect(status().isBadRequest());
+        create(ownerToken, titleBody("ab")).andExpect(status().isBadRequest());
         create(ownerToken, "{}").andExpect(status().isBadRequest());
         create(ownerToken, titleBody("          ")).andExpect(status().isBadRequest());
     }
@@ -272,7 +272,7 @@ class ProjectControllerTest extends AbstractIntegrationTest {
     void updateWithShortTitleReturnsBadRequest() throws Exception {
         String projectId = createAndGetId(ownerToken, "Backend Rewrite");
 
-        update(ownerToken, projectId, titleBody("Short")).andExpect(status().isBadRequest());
+        update(ownerToken, projectId, titleBody("ab")).andExpect(status().isBadRequest());
     }
 
     @Test

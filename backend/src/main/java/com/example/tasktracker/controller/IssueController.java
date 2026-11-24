@@ -99,6 +99,14 @@ public class IssueController {
         return issueService.assignIssue(organizationId, projectId, issueId, request, userDetails.getUsername());
     }
 
+    @PatchMapping("/{issueId}/assignee/me")
+    public IssueResponse assignToMe(@PathVariable UUID organizationId,
+                                    @PathVariable UUID projectId,
+                                    @PathVariable UUID issueId,
+                                    @AuthenticationPrincipal UserDetails userDetails){
+        return issueService.assignToMe(organizationId, projectId, issueId, userDetails.getUsername());
+    }
+
     @DeleteMapping("/{issueId}/assignee")
     public IssueResponse unassignIssue(@PathVariable UUID organizationId,
                                        @PathVariable UUID projectId,

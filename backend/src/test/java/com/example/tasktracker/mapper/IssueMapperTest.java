@@ -125,6 +125,6 @@ class IssueMapperTest {
     }
 
     private static CreateIssueRequest create(IssueType type, BugSeverity severity, String steps, Integer points) {
-        return new CreateIssueRequest(type, "Title", null, IssuePriority.HIGH, severity, steps, points, null);
+        return new CreateIssueRequest(type, "Title", null, IssuePriority.HIGH, severity, steps, points, null, null);
     }
 }

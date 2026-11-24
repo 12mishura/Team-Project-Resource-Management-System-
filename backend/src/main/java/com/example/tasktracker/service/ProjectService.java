@@ -15,6 +15,7 @@ import com.example.tasktracker.exception.ProjectNotFoundException;
 import com.example.tasktracker.mapper.ProjectMapper;
 import com.example.tasktracker.repository.OrganizationRepository;
 import com.example.tasktracker.repository.ProjectRepository;
+import com.example.tasktracker.security.ProjectPermissionChecker;
 import com.example.tasktracker.util.PageRequests;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -30,6 +31,7 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final ProjectMapper projectMapper;
     private final OrganizationRepository organizationRepository;
+    private final ProjectPermissionChecker permissionChecker;
 
     @OrganizationAccess(roles = {OrganizationRole.OWNER, OrganizationRole.ADMIN})
     @Transactional
@@ -59,10 +61,11 @@ public class ProjectService {
         return PageResponse.from(projects, projectMapper::toResponse);
     }
 
-    @OrganizationAccess(roles = {OrganizationRole.OWNER, OrganizationRole.ADMIN})
+    @OrganizationAccess
     @Transactional
-    public ProjectResponse updateProject(@OrganizationId UUID organizationId, UUID projectId, UpdateProjectRequest request){
+    public ProjectResponse updateProject(@OrganizationId UUID organizationId, UUID projectId, UpdateProjectRequest request, String email){
         Project project = findProject(organizationId, projectId);
+        permissionChecker.requireProjectAdmin(organizationId, projectId, email);
         if(request.title() != null && !request.title().equalsIgnoreCase(project.getTitle())
                 && projectRepository.existsByOrganizationIdAndTitleIgnoreCase(organizationId, request.title())){
             throw new DuplicateProjectTitleException(request.title());
@@ -72,10 +75,12 @@ public class ProjectService {
         return projectMapper.toResponse(project);
     }
 
-    @OrganizationAccess(roles = {OrganizationRole.OWNER, OrganizationRole.ADMIN})
+    @OrganizationAccess
     @Transactional
-    public ProjectResponse changeStatus(@OrganizationId UUID organizationId, UUID projectId, ChangeProjectStatusRequest request){
+    public ProjectResponse changeStatus(@OrganizationId UUID organizationId, UUID projectId, ChangeProjectStatusRequest request,
+                                        String email){
         Project project = findProject(organizationId, projectId);
+        permissionChecker.requireProjectAdmin(organizationId, projectId, email);
         project.changeStatus(request.status());
         projectRepository.flush();
         return projectMapper.toResponse(project);

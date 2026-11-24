@@ -42,6 +42,7 @@ Login и refresh возвращают `accessToken` (1 час), `refreshToken` (
 | ✅ | GET | `/organizations/{id}` | участник | `getOrganizationById` |
 | ✅ | PATCH | `/organizations/{id}` | OWNER, ADMIN | `updateOrganization` |
 | ✅ | DELETE | `/organizations/{id}` | OWNER | `deleteOrganization` |
+| ✅ | GET | `/organizations/{id}/overview` | участник | `OrganizationOverviewService.getOverview` — число проектов и участников, открытые задачи и мои задачи; по каждому доступному проекту: задачи по статусам, открытые баги, «на мне», участники (до 5 имён). OWNER / ADMIN видят все проекты, USER — только свои |
 | ✅ | GET | `/organizations/{id}/invite-code` | OWNER, ADMIN | `getInviteCode` |
 | ✅ | POST | `/organizations/{id}/invite-code/regenerate` | OWNER, ADMIN | `regenerateInviteCode` — старый код сразу перестаёт работать |
 | ✅ | POST | `/organizations/{id}/transfer-ownership` | OWNER | `transferOwnership` — новый владелец становится OWNER, старый ADMIN; в базе гарантирован ровно один OWNER |
@@ -63,9 +64,10 @@ Login и refresh возвращают `accessToken` (1 час), `refreshToken` (
 | ✅ | POST | `/{orgId}/projects` | OWNER, ADMIN | `createProject` |
 | ✅ | GET | `/{orgId}/projects?status=&page=&size=` | участник | `getProjects` |
 | ✅ | GET | `/{orgId}/projects/{projectId}` | участник | `getProject` |
-| ✅ | PATCH | `/{orgId}/projects/{projectId}` | OWNER, ADMIN | `updateProject` |
-| ✅ | PATCH | `/{orgId}/projects/{projectId}/status` | OWNER, ADMIN | `changeStatus` |
+| ✅ | PATCH | `/{orgId}/projects/{projectId}` | OWNER, ADMIN организации или ADMIN проекта | `updateProject` |
+| ✅ | PATCH | `/{orgId}/projects/{projectId}/status` | OWNER, ADMIN организации или ADMIN проекта | `changeStatus` |
 | ✅ | DELETE | `/{orgId}/projects/{projectId}` | OWNER | `deleteProject` |
+| ✅ | GET | `/{orgId}/projects/{projectId}/activity?page=&size=` | участник проекта | `IssueService.getProjectActivity` — лента событий всех задач проекта, новые сверху, с названием и типом задачи |
 
 ## 5.1. Участники проекта — `ProjectMemberController` / `ProjectMemberService`
 
@@ -73,10 +75,10 @@ Login и refresh возвращают `accessToken` (1 час), `refreshToken` (
 
 | | HTTP | Путь | Доступ | Что делает |
 |---|---|---|---|---|
-| ✅ | POST | `/members` | OWNER, ADMIN организации | `addMember` |
+| ✅ | POST | `/members` | OWNER, ADMIN организации или ADMIN проекта | `addMember` |
 | ✅ | GET | `/members?page=&size=` | участник организации | `getMembers` |
-| ✅ | PATCH | `/members/{projectMemberId}` | OWNER, ADMIN | `updateRole` |
-| ✅ | DELETE | `/members/{projectMemberId}` | OWNER, ADMIN | `removeMember` |
+| ✅ | PATCH | `/members/{projectMemberId}` | OWNER, ADMIN организации или ADMIN проекта (свою роль ADMIN проекта менять не может) | `updateRole` |
+| ✅ | DELETE | `/members/{projectMemberId}` | OWNER, ADMIN организации или ADMIN проекта (удалить себя ADMIN проекта не может) | `removeMember` |
 
 ## 6. Задачи — `IssueController` / `IssueService`
 
@@ -84,12 +86,13 @@ Login и refresh возвращают `accessToken` (1 час), `refreshToken` (
 
 | | HTTP | Путь | Метод сервиса |
 |---|---|---|---|
-| ✅ | POST | `/issues` | `createIssue` — тип в поле `type`; `parentId` сразу при создании — только EXTENDED / ADMIN |
+| ✅ | POST | `/issues` | `createIssue` — тип в поле `type`; `parentId` сразу при создании — только EXTENDED / ADMIN; `assigneeId` (id участника проекта) — по тем же правилам, что и назначение: USER может указать только себя |
 | ✅ | GET | `/issues?type=&status=&assigneeId=&parentId=&q=&sortBy=&direction=&page=&size=` | `getIssues` — `q`: поиск по названию; `sortBy`: `CREATED_AT` / `UPDATED_AT` / `PRIORITY` / `STATUS`; `direction`: `ASC` / `DESC` |
 | ✅ | GET | `/issues/{issueId}` | `getIssue` |
 | ✅ | PATCH | `/issues/{issueId}` | `updateIssue` |
 | ✅ | PATCH | `/issues/{issueId}/status` | `changeStatus` — только по workflow (см. ниже) |
 | ✅ | PATCH | `/issues/{issueId}/assignee` | `assignIssue` — `projectMemberId` обязателен |
+| ✅ | PATCH | `/issues/{issueId}/assignee/me` | `assignToMe` — назначить себя; нужно быть участником проекта (OWNER / ADMIN организации добавляют себя на вкладке Members); USER — только на свободную задачу |
 | ✅ | DELETE | `/issues/{issueId}/assignee` | `unassignIssue` — снять исполнителя |
 | ✅ | PATCH | `/issues/{issueId}/parent` | `changeParent` — `parentId` обязателен |
 | ✅ | DELETE | `/issues/{issueId}/parent` | `detachFromEpic` — отвязать от Epic |
