@@ -32,5 +32,3 @@ npm.cmd run dev
 | `npm.cmd run check`                   | typecheck, lint, format:check и unit-тесты разом       |
 
 Перед первым запуском e2e установите браузер: `npx.cmd playwright install chromium`. E2E-тесты работают с настоящим бэкендом: он должен быть запущен на порту 8080 вместе с PostgreSQL. Vite Playwright поднимет сам или использует уже запущенный на порту 5173. Каждый прогон создаёт новых пользователей и организации с уникальными именами, поэтому запускать тесты лучше на локальной или тестовой базе.
-
-Те же проверки выполняет GitHub Actions (`.github/workflows/ci.yml`) для каждого pull request.
