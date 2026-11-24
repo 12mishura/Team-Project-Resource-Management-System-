@@ -1,243 +1,640 @@
-import { ArrowRight, Building2, ClipboardList, Folder, FolderOpen, LogOut, Pencil, Plus, Trash2, Users } from 'lucide-react'
-import { useCallback, useEffect, useState, useSyncExternalStore, type FormEvent } from 'react'
-import { api, getProfile, hasSession, signOut, subscribeSession, type Organization, type Project, type User } from './api'
-import { Auth } from './Auth'
-import { Issues } from './Issues'
-import { OrganizationPicker, organizationRoles } from './OrganizationPicker'
-import { ProjectMembers } from './ProjectMembers'
-import { navigate, routePath, useRoute } from './router'
-import { MetadataEditor, MetadataFields, OrganizationProfile, UserProfile, readMetadata } from './Profiles'
-import { Brand, Empty, ErrorNotice, Loading, Modal, Pagination, useAction, useResource } from './ui'
+import {
+  ArrowRight,
+  Bug,
+  Building2,
+  CircleCheck,
+  ClipboardList,
+  Folder,
+  FolderPlus,
+  House,
+  LogOut,
+  Menu as MenuIcon,
+  Moon,
+  Plus,
+  Settings,
+  Sun,
+  UserCheck,
+  Users,
+  X,
+} from 'lucide-react'
+import { Fragment, lazy, Suspense, useCallback, useEffect, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
+import { api, getProfile, hasSession, signOut, subscribeSession, type Organization, type Project, type ProjectStats } from './api'
+import { FeedbackHost } from './feedback'
+import { toast } from './feedbackStore'
+import { Avatar, StatusBar } from './bits'
+import { MetadataFields } from './forms'
+import { noun, organizationRoles, plural, projectStatuses, readMetadata, toOptions } from './labels'
+import { OrganizationPicker } from './OrganizationPicker'
+import { forgetOrganization, forgetProject, readLastOrganization, saveLastOrganization, useRecentProjects } from './recent'
+import { navigate, routePath, useRoute, type Route } from './router'
+import { Select } from './Select'
+import { toggleTheme, useTheme } from './theme'
+import { useAction, useResource } from './hooks'
+import { Brand, Empty, ErrorNotice, Loading, Modal, Pagination } from './ui'
+import { ErrorBoundary } from './ErrorBoundary'
 
-export const projectStatuses = { ACTIVE: 'Active', FINISHED: 'Completed', ARCHIVED: 'Archived' }
+const Auth = lazy(() => import('./Auth').then(module => ({ default: module.Auth })))
+const Dashboard = lazy(() => import('./Dashboard').then(module => ({ default: module.Dashboard })))
+const Issues = lazy(() => import('./Issues').then(module => ({ default: module.Issues })))
+const ProjectPage = lazy(() => import('./ProjectPage').then(module => ({ default: module.ProjectPage })))
+const UserProfile = lazy(() => import('./Profiles').then(module => ({ default: module.UserProfile })))
+const OrganizationMembers = lazy(() => import('./Profiles').then(module => ({ default: module.OrganizationMembers })))
+const OrganizationSettings = lazy(() => import('./Profiles').then(module => ({ default: module.OrganizationSettings })))
+
 const canManage = (organization: Organization) => organization.role !== 'USER'
 
 export function App() {
   const active = useSyncExternalStore(subscribeSession, hasSession)
   const [logoutWarning, setLogoutWarning] = useState('')
   const [passwordChanged, setPasswordChanged] = useState(false)
-  useEffect(() => { if (active) setPasswordChanged(false) }, [active])
-  if (!active) return <Auth logoutWarning={logoutWarning} passwordChanged={passwordChanged} />
-  return <Workspace onPasswordChanged={() => { setLogoutWarning(''); setPasswordChanged(true) }} logout={() => {
-    setPasswordChanged(false)
-    setLogoutWarning('')
-    void signOut().catch(() => setLogoutWarning('You signed out locally, but the server could not confirm that the session was revoked.'))
-  }} />
+  useEffect(() => {
+    if (active) setPasswordChanged(false)
+  }, [active])
+  if (!active)
+    return (
+      <>
+        <Suspense fallback={<Loading />}>
+          <Auth logoutWarning={logoutWarning} passwordChanged={passwordChanged} />
+        </Suspense>
+        <FeedbackHost />
+      </>
+    )
+  return (
+    <>
+      <FeedbackHost />
+      <Workspace
+        onPasswordChanged={() => {
+          setLogoutWarning('')
+          setPasswordChanged(true)
+        }}
+        logout={() => {
+          setPasswordChanged(false)
+          setLogoutWarning('')
+          void signOut().catch(() =>
+            setLogoutWarning('You signed out locally, but the server could not confirm that the session was revoked.'),
+          )
+        }}
+      />
+    </>
+  )
 }
+
+type Crumb = { label: string; route?: Route }
 
 function Workspace({ logout, onPasswordChanged }: { logout: () => void; onPasswordChanged: () => void }) {
   const profile = useResource(getProfile)
   const organizations = useResource(api.organizations)
   const route = useRoute()
-  const view = route.name
-  const routeOrgId = 'orgId' in route ? route.orgId : ''
-  const [lastOrgId, setLastOrgId] = useState(routeOrgId)
-  const [lastProject, setLastProject] = useState<Project | null>(null)
+  const routeOrgId = route.name === 'org' || route.name === 'project' ? route.orgId : ''
+  const [lastOrgId, setLastOrgId] = useState(readLastOrganization)
   const [form, setForm] = useState<'organization' | 'join' | 'project' | null>(null)
-  const orgId = routeOrgId || lastOrgId
-  const organization = organizations.value?.find(item => item.id === orgId)
+  const [navOpen, setNavOpen] = useState(false)
+  const list = organizations.value ?? []
+  const organization = list.find(item => item.id === (routeOrgId || lastOrgId)) ?? (routeOrgId ? undefined : list[0])
+  const orgId = organization?.id ?? ''
   const missingOrganization = Boolean(routeOrgId && organizations.value && !organization)
-  const boardProject = route.name === 'board' && lastProject?.id === route.projectId ? lastProject : null
-  const navProject = lastProject && lastProject.organizationId === orgId ? lastProject : null
+  const recent = useRecentProjects(orgId)
+  const path = routePath(route)
+  const { theme } = useTheme()
 
   useEffect(() => {
-    if (routePath(route) !== window.location.pathname) navigate(route, { replace: true })
+    if (path !== window.location.pathname + window.location.search) navigate(route, { replace: true })
   })
   useEffect(() => {
-    if (routeOrgId) setLastOrgId(routeOrgId)
-  }, [routeOrgId])
+    if (routeOrgId && organization) {
+      setLastOrgId(routeOrgId)
+      saveLastOrganization(routeOrgId)
+    }
+  }, [routeOrgId, organization])
+  useEffect(() => {
+    setNavOpen(false)
+  }, [path])
 
-  function openOrganization(id: string) {
-    navigate({ name: 'projects', orgId: id })
-  }
+  const openOrganization = (id: string) => navigate({ name: 'org', orgId: id, section: 'projects' })
+  const openProject = (project: Project) =>
+    navigate({ name: 'project', orgId: project.organizationId, projectId: project.id, tab: 'board' })
 
-  function openProject(next: Project) {
-    setLastProject(next)
-    navigate({ name: 'board', orgId: next.organizationId, projectId: next.id })
-  }
+  const navItem = (label: string, icon: ReactNode, target: Route, active: boolean) => (
+    <button key={label + routePath(target)} aria-current={active ? 'page' : undefined} onClick={() => navigate(target)}>
+      {icon}
+      <span>{label}</span>
+    </button>
+  )
 
-  function go(key: typeof nav[number]['key']) {
-    if (key === 'organizations' || key === 'mine') navigate({ name: key })
-    else if (key === 'board' && navProject) navigate({ name: 'board', orgId, projectId: navProject.id })
-    else if (key === 'organization' || key === 'projects') navigate({ name: key, orgId })
-  }
+  const projectTitle = route.name === 'project' ? recent.find(item => item.id === route.projectId)?.title : undefined
+  const orgCrumb: Crumb | undefined = organization
+    ? { label: organization.title, route: { name: 'org', orgId, section: 'projects' } }
+    : undefined
+  const crumbs: Crumb[] =
+    route.name === 'home'
+      ? [{ label: 'Home' }]
+      : route.name === 'mine'
+        ? [{ label: 'My issues' }]
+        : route.name === 'profile'
+          ? [{ label: 'Your profile' }]
+          : route.name === 'organizations'
+            ? [{ label: 'Organizations' }]
+            : route.name === 'org'
+              ? [
+                  ...(orgCrumb ? [orgCrumb] : []),
+                  { label: route.section === 'projects' ? 'Projects' : route.section === 'members' ? 'Members' : 'Settings' },
+                ]
+              : [
+                  ...(orgCrumb ? [orgCrumb, { label: 'Projects', route: orgCrumb.route }] : []),
+                  {
+                    label: projectTitle ?? 'Project',
+                    route: { name: 'project', orgId: route.orgId, projectId: route.projectId, tab: 'board' },
+                  },
+                  { label: route.tab[0].toUpperCase() + route.tab.slice(1) },
+                ]
 
-  const nav = [
-    { key: 'organizations', label: 'Organizations', icon: Building2, visible: true },
-    { key: 'organization', label: 'Organization profile', icon: Building2, visible: Boolean(organization) },
-    { key: 'projects', label: 'Projects', icon: Folder, visible: Boolean(organization) },
-    { key: 'board', label: navProject?.title ?? '', icon: FolderOpen, visible: Boolean(organization && navProject) },
-    { key: 'mine', label: 'My issues', icon: ClipboardList, visible: true },
-  ] as const
-
-  return <div className="workspace">
-    <aside className="sidebar">
-      <Brand />
-      {organizations.value && organizations.value.length > 0 &&
-        <OrganizationPicker organizations={organizations.value} selectedId={organization ? orgId : ''} onSelect={openOrganization} />}
-      <nav className="navigation" aria-label="Main navigation">
-        {nav.filter(item => item.visible).map(({ key, label, icon: Icon }) =>
-          <button key={key} aria-current={view === key ? 'page' : undefined} onClick={() => go(key)}>
-            <Icon size={17} /><span>{label}</span>
-          </button>)}
-      </nav>
-      <div className="account">
-        <button type="button" className="account-profile" aria-label="My profile" aria-current={view === 'profile' ? 'page' : undefined} onClick={() => navigate({ name: 'profile' })}>
-          <span className="avatar" aria-hidden="true">{profile.value?.username.slice(0, 2).toUpperCase() ?? '—'}</span>
-          <span className="account-name">{profile.value?.username ?? 'Account'}<small>My profile</small></span>
-        </button>
-        <button type="button" className="icon-button" title="Sign out" aria-label="Sign out" onClick={logout}><LogOut size={17} /></button>
-      </div>
-    </aside>
-    <main className="main">
-      <div className="breadcrumb">TaskTracker <span>/</span> {view === 'mine' || view === 'profile' ? 'Personal' : organization?.title ?? 'Workspace'}
-        {view === 'board' && boardProject && <><span>/</span> {boardProject.title}</>}
-      </div>
-      <ErrorNotice text={profile.error} retry={profile.retry} />
-      <ErrorNotice text={organizations.error} retry={organizations.retry} />
-      {view === 'organizations' && <>
-        <header className="page-heading">
-          <div><h1>Organizations</h1><p>Choose a workspace</p></div>
-          <div className="row">
-            <button className="button" onClick={() => setForm('join')}>Join with a code</button>
-            <button className="button primary" onClick={() => setForm('organization')}><Plus size={17} />Create organization</button>
+  return (
+    <div className="workspace">
+      <aside className="sidebar" data-open={navOpen || undefined}>
+        <div className="sidebar-top">
+          <Brand />
+          <button
+            type="button"
+            className="icon-button sidebar-toggle"
+            aria-expanded={navOpen}
+            aria-label={navOpen ? 'Close menu' : 'Open menu'}
+            onClick={() => setNavOpen(open => !open)}>
+            {navOpen ? <X size={18} /> : <MenuIcon size={18} />}
+          </button>
+        </div>
+        <div className="sidebar-body">
+          <OrganizationPicker
+            organizations={list}
+            loading={!organizations.value}
+            selectedId={orgId}
+            onSelect={openOrganization}
+            onShowAll={() => navigate({ name: 'organizations' })}
+            onCreate={() => setForm('organization')}
+            onJoin={() => setForm('join')}
+          />
+          <nav className="navigation" aria-label="Main navigation">
+            <span className="nav-section">For you</span>
+            {navItem('Home', <House size={17} />, { name: 'home' }, route.name === 'home')}
+            {navItem('My issues', <ClipboardList size={17} />, { name: 'mine' }, route.name === 'mine')}
+            {organization && (
+              <>
+                <span className="nav-section">{organization.title}</span>
+                {navItem(
+                  'Projects',
+                  <Folder size={17} />,
+                  { name: 'org', orgId, section: 'projects' },
+                  route.name === 'org' && route.section === 'projects',
+                )}
+                {navItem(
+                  'Members',
+                  <Users size={17} />,
+                  { name: 'org', orgId, section: 'members' },
+                  route.name === 'org' && route.section === 'members',
+                )}
+                {navItem(
+                  'Settings',
+                  <Settings size={17} />,
+                  { name: 'org', orgId, section: 'settings' },
+                  route.name === 'org' && route.section === 'settings',
+                )}
+              </>
+            )}
+            {organization && recent.length > 0 && (
+              <>
+                <span className="nav-section">Recent projects</span>
+                {recent.map(item =>
+                  navItem(
+                    item.title,
+                    <Folder size={17} />,
+                    { name: 'project', orgId: item.organizationId, projectId: item.id, tab: 'board' },
+                    route.name === 'project' && route.projectId === item.id,
+                  ),
+                )}
+              </>
+            )}
+            {organizations.value && list.length === 0 && (
+              <div className="nav-empty">
+                <p>Create an organization or join one to start.</p>
+                <button className="button primary" onClick={() => setForm('organization')}>
+                  <Plus size={16} />
+                  Create organization
+                </button>
+              </div>
+            )}
+          </nav>
+          <div className="account">
+            <button
+              type="button"
+              className="account-profile"
+              aria-label="Your profile"
+              aria-current={route.name === 'profile' ? 'page' : undefined}
+              onClick={() => navigate({ name: 'profile' })}>
+              <Avatar name={profile.value?.username ?? null} />
+              <span className="account-name">
+                {profile.value?.username ?? 'Account'}
+                <small>Your profile</small>
+              </span>
+            </button>
+            <button type="button" className="icon-button" title="Sign out" aria-label="Sign out" onClick={logout}>
+              <LogOut size={17} />
+            </button>
           </div>
-        </header>
-        {organizations.loading && <Loading />}
-        {organizations.value?.length === 0 && <Empty title="No organizations yet">Create an organization or use an invite code to join a team.</Empty>}
-        <div className="card-grid">{organizations.value?.map(item =>
-          <button key={item.id} className="record-card" onClick={() => openOrganization(item.id)}>
-            <span className="record-icon"><Building2 size={20} /></span>
-            <span className="badge">{organizationRoles[item.role]}</span>
-            <strong>{item.title}</strong>
-            <span className="card-description">{item.description || 'No description'}</span>
-            <span className="card-link">Open <ArrowRight size={16} /></span>
-          </button>)}</div>
-      </>}
-      {routeOrgId && !organization && organizations.loading && <Loading />}
-      {missingOrganization && <Empty title="Organization not found">
-        It may have been deleted, or you are no longer a member.{' '}
-        <button className="button" onClick={() => navigate({ name: 'organizations' })}>Go to organizations</button>
-      </Empty>}
-      {view === 'profile' && (profile.value ? <UserProfile user={profile.value} onSaved={profile.setValue} onPasswordChanged={onPasswordChanged} /> : profile.loading && <Loading />)}
-      {route.name === 'organization' && organization && <OrganizationProfile key={organization.id}
-        organization={organization} openProjects={() => navigate({ name: 'projects', orgId: organization.id })}
-        onMembershipChanged={organizations.reload}
-        onLeft={() => { setLastOrgId(''); setLastProject(null); navigate({ name: 'organizations' }); organizations.reload() }}
-        onSaved={updated => organizations.setValue(current => current?.map(item => item.id === updated.id ? updated : item))} />}
-      {route.name === 'projects' && organization && <Projects key={organization.id}
-        organization={organization} onOpen={openProject} onCreate={() => setForm('project')}
-        openProfile={() => navigate({ name: 'organization', orgId: organization.id })} />}
-      {route.name === 'board' && organization && <ProjectBoard key={route.projectId} projectId={route.projectId} organization={organization}
-        user={profile.value} selectedIssueId={route.issueId}
-        onSelectIssue={issueId => navigate({ name: 'board', orgId: route.orgId, projectId: route.projectId, issueId })}
-        onLoaded={setLastProject}
-        onDeleted={() => { setLastProject(null); navigate({ name: 'projects', orgId: organization.id }) }} />}
-      {route.name === 'mine' && <Issues key="mine" project={null} organizations={organizations.value ?? []} user={profile.value}
-        selected={route.issue} onSelect={issue => navigate({ name: 'mine', issue })} />}
-      {form && <MetadataForm kind={form} organization={organization} close={() => setForm(null)} onSaved={result => {
-        if (form === 'project' && result) {
-          openProject(result)
-        } else {
-          organizations.reload()
-        }
-        setForm(null)
-      }} />}
-    </main>
-  </div>
+        </div>
+      </aside>
+      <main className="main">
+        <div className="topbar">
+          <nav className="breadcrumb" aria-label="Breadcrumb">
+            <button type="button" className="crumb-link" onClick={() => navigate({ name: 'home' })}>
+              TaskTracker
+            </button>
+            {crumbs.map((crumb, index) => (
+              <Fragment key={index}>
+                <span className="crumb-separator" aria-hidden="true">
+                  /
+                </span>
+                {crumb.route && index < crumbs.length - 1 ? (
+                  <button type="button" className="crumb-link" onClick={() => navigate(crumb.route!)}>
+                    {crumb.label}
+                  </button>
+                ) : (
+                  <span className="crumb-current" aria-current="page">
+                    {crumb.label}
+                  </span>
+                )}
+              </Fragment>
+            ))}
+          </nav>
+          <button
+            type="button"
+            className="icon-button theme-toggle"
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            onClick={toggleTheme}>
+            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          </button>
+        </div>
+        <ErrorNotice text={profile.error} retry={profile.retry} />
+        <ErrorNotice text={organizations.error} retry={organizations.retry} />
+        <ErrorBoundary
+          key={route.name === 'project' ? routePath({ ...route, issueId: undefined }) : path}
+          scope="page"
+          onHome={() => navigate({ name: 'home' })}>
+          <Suspense fallback={<Loading />}>
+            {route.name === 'home' && (
+              <Dashboard
+                user={profile.value}
+                organizations={list}
+                openIssue={issue => navigate({ name: 'mine', issue })}
+                openOrganization={openOrganization}
+                openMyIssues={() => navigate({ name: 'mine' })}
+                openProject={(organizationId, projectId) => navigate({ name: 'project', orgId: organizationId, projectId, tab: 'board' })}
+                openProjectIssue={(organizationId, projectId, issueId) =>
+                  navigate({ name: 'project', orgId: organizationId, projectId, tab: 'issues', issueId })
+                }
+              />
+            )}
+            {route.name === 'mine' && (
+              <Issues
+                key="mine"
+                project={null}
+                organizations={list}
+                user={profile.value}
+                selected={route.issue}
+                onSelect={issue => navigate({ name: 'mine', issue })}
+              />
+            )}
+            {route.name === 'profile' &&
+              (profile.value ? (
+                <UserProfile
+                  user={profile.value}
+                  organizations={list}
+                  onSaved={profile.setValue}
+                  onPasswordChanged={onPasswordChanged}
+                  openOrganization={openOrganization}
+                />
+              ) : (
+                profile.loading && <Loading />
+              ))}
+            {route.name === 'organizations' && (
+              <>
+                <header className="page-heading">
+                  <div>
+                    <h1>Organizations</h1>
+                    <p>Teams you belong to</p>
+                  </div>
+                  <div className="row">
+                    <button className="button" onClick={() => setForm('join')}>
+                      Join with a code
+                    </button>
+                    <button className="button primary" onClick={() => setForm('organization')}>
+                      <Plus size={17} />
+                      Create organization
+                    </button>
+                  </div>
+                </header>
+                {organizations.loading && !organizations.value && <Loading />}
+                {organizations.value?.length === 0 && (
+                  <Empty
+                    title="Start your first organization"
+                    icon={<Building2 size={22} />}
+                    action={
+                      <div className="row">
+                        <button className="button primary" onClick={() => setForm('organization')}>
+                          <Plus size={16} />
+                          Create organization
+                        </button>
+                        <button className="button" onClick={() => setForm('join')}>
+                          Join with a code
+                        </button>
+                      </div>
+                    }>
+                    An organization is a shared space for your team: projects, members and issues live inside it.
+                  </Empty>
+                )}
+                <div className="card-grid">
+                  {list.map(item => (
+                    <OrganizationCard key={item.id} organization={item} onOpen={() => openOrganization(item.id)} />
+                  ))}
+                </div>
+              </>
+            )}
+            {routeOrgId && !organization && organizations.loading && <Loading />}
+            {missingOrganization && (
+              <Empty
+                title="Organization not found"
+                icon={<Building2 size={22} />}
+                action={
+                  <button className="button" onClick={() => navigate({ name: 'organizations' })}>
+                    Go to organizations
+                  </button>
+                }>
+                It may have been deleted, or you are no longer a member.
+              </Empty>
+            )}
+            {route.name === 'org' && organization && route.section === 'projects' && (
+              <Projects key={orgId} organization={organization} onOpen={openProject} onCreate={() => setForm('project')} />
+            )}
+            {route.name === 'org' && organization && route.section === 'members' && (
+              <OrganizationMembers key={orgId} organization={organization} onMembershipChanged={organizations.reload} />
+            )}
+            {route.name === 'org' && organization && route.section === 'settings' && (
+              <OrganizationSettings
+                key={orgId}
+                organization={organization}
+                onSaved={updated => organizations.setValue(current => current?.map(item => (item.id === updated.id ? updated : item)))}
+                onLeft={() => {
+                  forgetOrganization(orgId)
+                  saveLastOrganization('')
+                  setLastOrgId('')
+                  navigate({ name: 'organizations' })
+                  organizations.reload()
+                }}
+              />
+            )}
+            {route.name === 'project' && organization && (
+              <ProjectPage
+                key={route.projectId}
+                organization={organization}
+                projectId={route.projectId}
+                tab={route.tab}
+                issueId={route.issueId}
+                user={profile.value}
+                onTab={(tab, issueId) => navigate({ name: 'project', orgId, projectId: route.projectId, tab, issueId })}
+                onSelectIssue={issueId => navigate({ name: 'project', orgId, projectId: route.projectId, tab: route.tab, issueId })}
+                onDeleted={() => {
+                  forgetProject(route.projectId)
+                  navigate({ name: 'org', orgId, section: 'projects' })
+                }}
+              />
+            )}
+          </Suspense>
+        </ErrorBoundary>
+        {form && (
+          <MetadataForm
+            kind={form}
+            organization={organization}
+            close={() => setForm(null)}
+            onSaved={result => {
+              if (form === 'project' && result) {
+                toast(`${result.title} created`)
+                openProject(result)
+              } else {
+                toast(form === 'join' ? 'You joined the organization' : 'Organization created')
+                organizations.reload()
+              }
+              setForm(null)
+            }}
+          />
+        )}
+      </main>
+    </div>
+  )
 }
 
-function Projects({ organization, onOpen, onCreate, openProfile }: {
-  organization: Organization; onOpen: (project: Project) => void; onCreate: () => void; openProfile: () => void
+function MemberStack({ names, total }: { names: string[]; total: number }) {
+  if (total === 0) return <span className="muted small-text">No members yet</span>
+  return (
+    <span className="member-stack" aria-label={plural(total, 'member')}>
+      {names.map(name => (
+        <Avatar key={name} name={name} size="tiny" />
+      ))}
+      {total > names.length && <span className="avatar tiny more-avatar">+{total - names.length}</span>}
+    </span>
+  )
+}
+
+function OrganizationCard({ organization, onOpen }: { organization: Organization; onOpen: () => void }) {
+  const overview = useResource(useCallback((signal: AbortSignal) => api.organizationOverview(organization.id, signal), [organization.id]))
+  const data = overview.value
+  return (
+    <button className="record-card rich-card" onClick={onOpen}>
+      <span className="card-top">
+        <span className="record-icon">
+          <Building2 size={20} />
+        </span>
+        <span className="badge">{organizationRoles[organization.role]}</span>
+      </span>
+      <strong>{organization.title}</strong>
+      <span className="card-description">{organization.description || 'No description'}</span>
+      <span className="card-stats">
+        <span>
+          <Folder size={14} />
+          {data ? plural(data.projectsCount, 'project') : '– projects'}
+        </span>
+        <span>
+          <Users size={14} />
+          {data ? plural(data.membersCount, 'member') : '– members'}
+        </span>
+        <span>
+          <UserCheck size={14} />
+          {data ? data.assignedToMe : '–'} on me
+        </span>
+      </span>
+      <span className="card-link">
+        Open <ArrowRight size={16} />
+      </span>
+    </button>
+  )
+}
+
+function ProjectCard({ project, stats, onOpen }: { project: Project; stats?: ProjectStats; onOpen: () => void }) {
+  const done = stats?.issuesByStatus.DONE ?? 0
+  const percent = stats && stats.totalIssues > 0 ? Math.round((done / stats.totalIssues) * 100) : 0
+  return (
+    <button className="record-card rich-card" onClick={onOpen} data-restricted={!stats || undefined}>
+      <span className="card-top">
+        <span className="record-icon">
+          <Folder size={20} />
+        </span>
+        <span className="badge" data-project-status={project.status}>
+          {projectStatuses[project.status]}
+        </span>
+      </span>
+      <strong>{project.title}</strong>
+      <span className="card-description">{project.description || 'No description'}</span>
+      {stats ? (
+        <>
+          <span className="card-progress">
+            <span className="progress-label">
+              <span>
+                {done} of {stats.totalIssues} done
+              </span>
+              <span>{percent}%</span>
+            </span>
+            <StatusBar counts={stats.issuesByStatus} total={stats.totalIssues} />
+          </span>
+          <span className="card-stats">
+            <span>
+              <CircleCheck size={14} />
+              {stats.openIssues} open
+            </span>
+            <span data-alert={stats.openBugs > 0 || undefined}>
+              <Bug size={14} />
+              {plural(stats.openBugs, 'bug')}
+            </span>
+            <span data-highlight={stats.assignedToMe > 0 || undefined}>
+              <UserCheck size={14} />
+              {stats.assignedToMe} on me
+            </span>
+          </span>
+          <span className="card-footer">
+            <MemberStack names={stats.members} total={stats.membersCount} />
+            <span className="card-link">
+              Open <ArrowRight size={16} />
+            </span>
+          </span>
+        </>
+      ) : (
+        <span className="card-footer">
+          <span className="muted small-text">You are not a member of this project</span>
+          <span className="card-link">
+            View <ArrowRight size={16} />
+          </span>
+        </span>
+      )}
+    </button>
+  )
+}
+
+function Projects({
+  organization,
+  onOpen,
+  onCreate,
+}: {
+  organization: Organization
+  onOpen: (project: Project) => void
+  onCreate: () => void
 }) {
   const [page, setPage] = useState(0)
   const [status, setStatus] = useState('')
   const load = useCallback((signal: AbortSignal) => api.projects(organization.id, page, status, signal), [organization.id, page, status])
   const data = useResource(load)
-  return <>
-    <header className="page-heading"><div><h1>Projects</h1><p>{organization.title}</p></div>
-      <div className="row">
-        <button className="button" onClick={openProfile}>Organization profile</button>
-        {canManage(organization) && <button className="button primary" onClick={onCreate}><Plus size={17} />Create project</button>}
+  const overview = useResource(useCallback((signal: AbortSignal) => api.organizationOverview(organization.id, signal), [organization.id]))
+  const stats = new Map((overview.value?.projects ?? []).map(item => [item.projectId, item]))
+  return (
+    <>
+      <header className="page-heading">
+        <div>
+          <h1>Projects</h1>
+          <p>{organization.title}</p>
+        </div>
+        {canManage(organization) && (
+          <button className="button primary" onClick={onCreate}>
+            <Plus size={17} />
+            Create project
+          </button>
+        )}
+      </header>
+      {overview.value && (
+        <section className="summary-strip" aria-label="Organization summary">
+          <span>
+            <strong>{overview.value.projectsCount}</strong> {noun(overview.value.projectsCount, 'project')}
+          </span>
+          <span>
+            <strong>{overview.value.membersCount}</strong> {noun(overview.value.membersCount, 'member')}
+          </span>
+          <span>
+            <strong>{overview.value.openIssues}</strong> open {noun(overview.value.openIssues, 'issue')}
+          </span>
+          <span>
+            <strong>{overview.value.assignedToMe}</strong> assigned to you
+          </span>
+        </section>
+      )}
+      <div className="toolbar">
+        <Select
+          aria-label="Project status"
+          value={status}
+          onChange={next => {
+            setStatus(next)
+            setPage(0)
+          }}
+          options={[{ value: '', label: 'All statuses' }, ...toOptions(projectStatuses)]}
+        />
       </div>
-    </header>
-    <div className="toolbar">
-      <select aria-label="Project status" value={status} onChange={event => { setStatus(event.target.value); setPage(0) }}>
-        <option value="">All statuses</option>
-        {Object.entries(projectStatuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-      </select>
-    </div>
-    <ErrorNotice text={data.error} retry={data.retry} />
-    {data.loading ? <Loading /> : <>
-      {data.value?.content.length === 0 && <Empty title={status ? 'No matching projects' : 'No projects yet'} />}
-      <div className="card-grid">{data.value?.content.map(item => <button key={item.id} className="record-card" onClick={() => onOpen(item)}>
-        <span className="record-icon"><Folder size={20} /></span>
-        <span className={`badge ${item.status === 'ACTIVE' ? 'blue' : ''}`}>{projectStatuses[item.status]}</span>
-        <strong>{item.title}</strong><span className="card-description">{item.description || 'No description'}</span>
-        <span className="card-link">Open <ArrowRight size={16} /></span>
-      </button>)}</div>
-      <Pagination data={data.value} onChange={setPage} />
-    </>}
-  </>
+      <ErrorNotice text={data.error} retry={data.retry} />
+      {data.loading && !data.value ? (
+        <Loading />
+      ) : (
+        <>
+          {data.value?.content.length === 0 &&
+            (status ? (
+              <Empty title="No matching projects">Try another status filter.</Empty>
+            ) : (
+              <Empty
+                title="Start your first project"
+                icon={<FolderPlus size={22} />}
+                action={
+                  canManage(organization) && (
+                    <button className="button primary" onClick={onCreate}>
+                      <Plus size={16} />
+                      Create project
+                    </button>
+                  )
+                }>
+                {canManage(organization)
+                  ? 'Projects hold the board, issues and members of one piece of work.'
+                  : 'An owner or admin of this organization can create the first project.'}
+              </Empty>
+            ))}
+          <div className="card-grid">
+            {data.value?.content.map(item => (
+              <ProjectCard key={item.id} project={item} stats={stats.get(item.id)} onOpen={() => onOpen(item)} />
+            ))}
+          </div>
+          <Pagination data={data.value} onChange={setPage} />
+        </>
+      )}
+    </>
+  )
 }
 
-function ProjectBoard({ projectId, organization, user, selectedIssueId, onSelectIssue, onLoaded, onDeleted }: {
-  projectId: string
-  organization: Organization
-  user?: User
-  selectedIssueId?: string
-  onSelectIssue: (issueId?: string) => void
-  onLoaded: (project: Project) => void
-  onDeleted: () => void
-}) {
-  const load = useCallback((signal: AbortSignal) => api.project(organization.id, projectId, signal), [organization.id, projectId])
-  const detail = useResource(load)
-  const [editing, setEditing] = useState(false)
-  const [managingMembers, setManagingMembers] = useState(false)
-  const statusAction = useAction()
-  const current = detail.value
-
-  useEffect(() => {
-    if (current) onLoaded(current)
-  }, [current, onLoaded])
-
-  function deleteProject(target: Project) {
-    const typed = window.prompt(`This permanently deletes ${target.title} with all its issues, comments and members. Type the project title to confirm.`)
-    if (typed === null) return
-    if (typed.trim() !== target.title) {
-      window.alert('The title does not match. Nothing was deleted.')
-      return
-    }
-    void statusAction.run(async () => {
-      await api.deleteProject(target)
-      onDeleted()
-    })
-  }
-
-  return <>
-    <ErrorNotice text={detail.error} retry={detail.retry} />
-    {detail.loading && !current && <Loading />}
-    {current && <Issues project={current} organizations={[organization]} user={user}
-      selected={selectedIssueId ? { organizationId: current.organizationId, projectId: current.id, id: selectedIssueId } : undefined}
-      onSelect={issue => onSelectIssue(issue?.id)}
-      projectControls={canManage(organization) && <>
-      <button className="button" onClick={() => setManagingMembers(true)}><Users size={15} />Members</button>
-      <button className="button" onClick={() => setEditing(true)} disabled={statusAction.busy}><Pencil size={15} />Edit project</button>
-      <select aria-label="Change project status" value={current.status} disabled={statusAction.busy} onChange={event => {
-        const status = event.target.value as Project['status']
-        void statusAction.run(async () => detail.setValue(await api.changeProjectStatus(current, status)))
-      }}>
-        {Object.entries(projectStatuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-      </select>
-      {organization.role === 'OWNER' && <button className="button danger" disabled={statusAction.busy} onClick={() => deleteProject(current)}><Trash2 size={15} />Delete project</button>}
-      </>} projectError={statusAction.error} />}
-    {current && editing && <MetadataEditor title="Edit project" initial={current} close={() => setEditing(false)}
-      save={async changes => detail.setValue(await api.updateProject(current, changes))} />}
-    {current && managingMembers && <ProjectMembers project={current} close={() => setManagingMembers(false)} />}
-  </>
-}
-
-function MetadataForm({ kind, organization, close, onSaved }: {
+function MetadataForm({
+  kind,
+  organization,
+  close,
+  onSaved,
+}: {
   kind: 'organization' | 'join' | 'project'
   organization?: Organization
   close: () => void
@@ -262,11 +659,31 @@ function MetadataForm({ kind, organization, close, onSaved }: {
       }
     })
   }
-  return <Modal title={title} close={() => { if (!busy) close() }}>
-    <form className="form" onSubmit={submit}>
-      {kind === 'join' ? <label>Invite code<input required name="code" maxLength={9} /></label> : <MetadataFields />}
-      <ErrorNotice text={error} />
-      <button className="button primary" disabled={busy}>{busy ? 'Please wait…' : kind === 'join' ? 'Join' : 'Create'}</button>
-    </form>
-  </Modal>
+  return (
+    <Modal
+      title={title}
+      close={() => {
+        if (!busy) close()
+      }}>
+      <form className="form" onSubmit={submit}>
+        {kind === 'join' ? (
+          <label>
+            Invite code
+            <input required name="code" maxLength={9} placeholder="abcd-1234" autoFocus />
+          </label>
+        ) : (
+          <MetadataFields />
+        )}
+        <ErrorNotice text={error} />
+        <div className="row">
+          <button className="button primary" disabled={busy}>
+            {busy ? 'Please wait…' : kind === 'join' ? 'Join' : 'Create'}
+          </button>
+          <button type="button" className="button" disabled={busy} onClick={close}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
 }

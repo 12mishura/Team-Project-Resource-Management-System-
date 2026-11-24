@@ -29,6 +29,33 @@ interface NamedRecord {
   description: string | null
 }
 
+export interface ProjectStats {
+  projectId: string
+  issuesByStatus: Record<IssueStatus, number>
+  totalIssues: number
+  openIssues: number
+  openBugs: number
+  assignedToMe: number
+  membersCount: number
+  members: string[]
+}
+
+export interface OrganizationOverview {
+  organizationId: string
+  projectsCount: number
+  membersCount: number
+  openIssues: number
+  assignedToMe: number
+  projects: ProjectStats[]
+}
+
+export interface ProjectActivity extends Omit<IssueEvent, 'id'> {
+  id: string
+  issueId: string
+  issueTitle: string
+  issueType: IssueType
+}
+
 export interface Organization extends NamedRecord {
   role: OrganizationRole
   memberId: string
@@ -40,6 +67,8 @@ export interface Project extends NamedRecord {
 }
 
 export interface Issue extends NamedRecord {
+  createdAt: string
+  updatedAt: string
   organizationId: string
   projectId: string
   type: IssueType
@@ -94,7 +123,10 @@ export interface IssueEvent {
 }
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
     super(message)
   }
 }
@@ -137,11 +169,14 @@ function saveSession(next: Session | null) {
 export const hasSession = () => session !== null
 export function subscribeSession(notify: () => void) {
   listeners.add(notify)
-  return () => { listeners.delete(notify) }
+  return () => {
+    listeners.delete(notify)
+  }
 }
 
 function friendlyForbidden(detail: string) {
-  if (detail.startsWith('Access denied to project')) return 'You are not a member of this project. Ask an organization owner or admin to add you.'
+  if (detail.startsWith('Access denied to project'))
+    return 'You are not a member of this project. Ask an organization owner or admin to add you.'
   if (detail.startsWith('Access denied to organization')) return 'You are not a member of this organization anymore.'
   return detail
 }
@@ -167,9 +202,12 @@ async function send<T>(path: string, options: RequestOptions = {}, token?: strin
     const problem = await response.json().catch(() => null)
     const fallback = response.status === 403 ? 'You don’t have access to this section.' : `API error (${response.status}).`
     const detail = typeof problem?.detail === 'string' ? problem.detail : fallback
-    throw new ApiError(response.status, response.status === 403 ? friendlyForbidden(detail) : response.status === 404 ? friendlyNotFound(detail) : detail)
+    throw new ApiError(
+      response.status,
+      response.status === 403 ? friendlyForbidden(detail) : response.status === 404 ? friendlyNotFound(detail) : detail,
+    )
   }
-  return response.status === 204 ? undefined as T : response.json()
+  return response.status === 204 ? (undefined as T) : response.json()
 }
 
 async function request<T>(path: string, options?: RequestOptions): Promise<T> {
@@ -194,7 +232,9 @@ async function request<T>(path: string, options?: RequestOptions): Promise<T> {
           }
           throw error
         })
-        .finally(() => { if (refreshing === renewal) refreshing = undefined })
+        .finally(() => {
+          if (refreshing === renewal) refreshing = undefined
+        })
       refreshing = renewal
     }
     const latest = session === initial ? await refreshing : session
@@ -240,7 +280,15 @@ const projectPath = (orgId: string, projectId: string) => orgPath(orgId) + '/pro
 const issuePath = (issue: IssueRef) => projectPath(issue.organizationId, issue.projectId) + '/issues/' + encodeURIComponent(issue.id)
 
 export type Metadata = { title: string; description: string }
-type IssueFilters = { q: string; type: string; status: string }
+export type IssueFilters = {
+  q?: string
+  type?: string
+  status?: string
+  assigneeId?: string
+  parentId?: string
+  sortBy?: string
+  direction?: string
+}
 export type IssueFields = {
   title: string
   description?: string
@@ -250,7 +298,7 @@ export type IssueFields = {
   storyPoints?: number
 }
 
-async function listAll<T>(path: string, signal?: AbortSignal, filters: Record<string, string> = {}): Promise<T[]> {
+async function listAll<T>(path: string, signal?: AbortSignal, filters: Record<string, string | undefined> = {}): Promise<T[]> {
   const first = await list<T>(path, 0, filters, signal, 100)
   const all = [...first.content]
   for (let page = 1; page < first.totalPages; page++) {
@@ -260,9 +308,11 @@ async function listAll<T>(path: string, signal?: AbortSignal, filters: Record<st
   return all
 }
 
-function list<T>(path: string, page: number, filters: Record<string, string>, signal?: AbortSignal, size = 20) {
+function list<T>(path: string, page: number, filters: Record<string, string | undefined>, signal?: AbortSignal, size = 20) {
   const params = new URLSearchParams({ page: String(page), size: String(size) })
-  Object.entries(filters).forEach(([key, value]) => { if (value) params.set(key, value) })
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, value)
+  })
   return request<Page<T>>(`${path}?${params}`, { signal })
 }
 
@@ -270,6 +320,7 @@ export const api = {
   updateProfile: (username: string) => request<User>('/users/me', { method: 'PATCH', body: { username } }),
   organizations: (signal?: AbortSignal) => listAll<Organization>('/organizations', signal),
   organization: (id: string, signal?: AbortSignal) => request<NamedRecord>(orgPath(id), { signal }),
+  organizationOverview: (id: string, signal?: AbortSignal) => request<OrganizationOverview>(orgPath(id) + '/overview', { signal }),
   updateOrganization: (id: string, body: Partial<Metadata>) => request<NamedRecord>(orgPath(id), { method: 'PATCH', body }),
   organizationMembers: (id: string, page: number, signal?: AbortSignal) =>
     list<OrganizationMember>(orgPath(id) + '/members', page, {}, signal),
@@ -287,6 +338,8 @@ export const api = {
   joinOrganization: (inviteCode: string) => request('/organizations/join', { method: 'POST', body: { inviteCode } }),
   projects: (id: string, page: number, status: string, signal?: AbortSignal) =>
     list<Project>(orgPath(id) + '/projects', page, { status }, signal),
+  myIssues: (signal?: AbortSignal) => listAll<Issue>('/users/me/issues', signal),
+  allProjects: (id: string, signal?: AbortSignal) => listAll<Project>(orgPath(id) + '/projects', signal),
   project: (orgId: string, projectId: string, signal?: AbortSignal) => request<Project>(projectPath(orgId, projectId), { signal }),
   createProject: (id: string, body: Metadata) => request<Project>(orgPath(id) + '/projects', { method: 'POST', body }),
   updateProject: (project: Project, body: Partial<Metadata>) =>
@@ -298,9 +351,15 @@ export const api = {
   projectMembers: (project: Project, signal?: AbortSignal) =>
     listAll<ProjectMember>(projectPath(project.organizationId, project.id) + '/members', signal),
   addProjectMember: (project: Project, organizationMemberId: string, role: ProjectMemberRole) =>
-    request<ProjectMember>(projectPath(project.organizationId, project.id) + '/members', { method: 'POST', body: { organizationMemberId, role } }),
+    request<ProjectMember>(projectPath(project.organizationId, project.id) + '/members', {
+      method: 'POST',
+      body: { organizationMemberId, role },
+    }),
   updateProjectMember: (project: Project, member: ProjectMember, role: ProjectMemberRole) =>
-    request<ProjectMember>(projectPath(project.organizationId, project.id) + '/members/' + encodeURIComponent(member.id), { method: 'PATCH', body: { role } }),
+    request<ProjectMember>(projectPath(project.organizationId, project.id) + '/members/' + encodeURIComponent(member.id), {
+      method: 'PATCH',
+      body: { role },
+    }),
   removeProjectMember: (project: Project, member: ProjectMember) =>
     request<void>(projectPath(project.organizationId, project.id) + '/members/' + encodeURIComponent(member.id), { method: 'DELETE' }),
   allIssues: async (project: Project, filters: IssueFilters, signal?: AbortSignal): Promise<Page<Issue>> => {
@@ -310,23 +369,25 @@ export const api = {
   issues: (project: Project | null, page: number, filters: IssueFilters, signal?: AbortSignal) =>
     list<Issue>(project ? projectPath(project.organizationId, project.id) + '/issues' : '/users/me/issues', page, filters, signal),
   issue: (issue: IssueRef, signal?: AbortSignal) => request<Issue>(issuePath(issue), { signal }),
-  createIssue: (project: Project, body: IssueFields & { type: IssueType }) =>
+  createIssue: (project: Project, body: IssueFields & { type: IssueType; assigneeId?: string; parentId?: string }) =>
     request<Issue>(projectPath(project.organizationId, project.id) + '/issues', { method: 'POST', body }),
   updateIssue: (issue: Issue, body: Partial<IssueFields>) => request<Issue>(issuePath(issue), { method: 'PATCH', body }),
   deleteIssue: (issue: Issue) => request<void>(issuePath(issue), { method: 'DELETE' }),
-  changeStatus: (issue: Issue, status: IssueStatus) =>
-    request<Issue>(issuePath(issue) + '/status', { method: 'PATCH', body: { status } }),
-  assignee: (issue: Issue, projectMemberId: string) => request<Issue>(issuePath(issue) + '/assignee',
-    projectMemberId ? { method: 'PATCH', body: { projectMemberId } } : { method: 'DELETE' }),
+  changeStatus: (issue: Issue, status: IssueStatus) => request<Issue>(issuePath(issue) + '/status', { method: 'PATCH', body: { status } }),
+  assignToMe: (issue: Issue) => request<Issue>(issuePath(issue) + '/assignee/me', { method: 'PATCH' }),
+  assignee: (issue: Issue, projectMemberId: string) =>
+    request<Issue>(issuePath(issue) + '/assignee', projectMemberId ? { method: 'PATCH', body: { projectMemberId } } : { method: 'DELETE' }),
   epics: (project: Project, signal?: AbortSignal) =>
     listAll<Issue>(projectPath(project.organizationId, project.id) + '/issues', signal, { type: 'EPIC' }),
-  parent: (issue: Issue, parentId: string) => request<Issue>(issuePath(issue) + '/parent',
-    parentId ? { method: 'PATCH', body: { parentId } } : { method: 'DELETE' }),
+  parent: (issue: Issue, parentId: string) =>
+    request<Issue>(issuePath(issue) + '/parent', parentId ? { method: 'PATCH', body: { parentId } } : { method: 'DELETE' }),
   comments: (issue: IssueRef, page: number, signal?: AbortSignal) => list<Comment>(issuePath(issue) + '/comments', page, {}, signal),
   comment: (issue: IssueRef, text: string) => request<Comment>(issuePath(issue) + '/comments', { method: 'POST', body: { text } }),
   editComment: (issue: IssueRef, comment: Comment, text: string) =>
     request<Comment>(issuePath(issue) + '/comments/' + encodeURIComponent(comment.id), { method: 'PATCH', body: { text } }),
   deleteComment: (issue: IssueRef, comment: Comment) =>
     request<void>(issuePath(issue) + '/comments/' + encodeURIComponent(comment.id), { method: 'DELETE' }),
+  projectActivity: (project: Project, page: number, signal?: AbortSignal, size = 20) =>
+    list<ProjectActivity>(projectPath(project.organizationId, project.id) + '/activity', page, {}, signal, size),
   history: (issue: IssueRef, page: number, signal?: AbortSignal) => list<IssueEvent>(issuePath(issue) + '/history', page, {}, signal),
 }
