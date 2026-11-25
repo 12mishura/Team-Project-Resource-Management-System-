@@ -151,13 +151,17 @@ if echo "$BODY" | grep -q '"totalElements":0'; then
     call POST "$ISSUES/$2/comments" "${TOKEN[$1]}" "{\"text\":\"$3\"}"
     expect "comment" 201
   }
+  log_work() {
+    call POST "$ISSUES/$2/worklogs" "${TOKEN[$1]}"       "{\"minutes\":$3,\"workDate\":\"$(date -d "-$4 days" +%F)\",\"comment\":\"$5\"}"
+    expect "log work" 201
+  }
 
   EPIC=$(issue demo_lead '{"type":"EPIC","title":"Authentication","description":"Login, registration and sessions","priority":"HIGH"}')
-  STORY=$(issue demo_lead "{\"type\":\"STORY\",\"title\":\"User can reset password\",\"storyPoints\":5,\"priority\":\"HIGH\",\"parentId\":\"$EPIC\"}")
-  TASK=$(issue demo_lead "{\"type\":\"TASK\",\"title\":\"Add rate limiting to login\",\"priority\":\"MEDIUM\",\"parentId\":\"$EPIC\"}")
-  BUG=$(issue demo_dev '{"type":"BUG","title":"Login fails with uppercase email","severity":"MAJOR","stepsToReproduce":"Register with Alice@Mail.com and log in","priority":"CRITICAL"}')
-  FREE=$(issue demo_dev2 '{"type":"TASK","title":"Write README","priority":"LOW"}')
-  DONE=$(issue demo_dev '{"type":"TASK","title":"Set up Docker Compose","priority":"MEDIUM"}')
+  STORY=$(issue demo_lead "{\"type\":\"STORY\",\"title\":\"User can reset password\",\"storyPoints\":5,\"estimateMinutes\":960,\"priority\":\"HIGH\",\"parentId\":\"$EPIC\"}")
+  TASK=$(issue demo_lead "{\"type\":\"TASK\",\"title\":\"Add rate limiting to login\",\"estimateMinutes\":360,\"priority\":\"MEDIUM\",\"parentId\":\"$EPIC\"}")
+  BUG=$(issue demo_dev '{"type":"BUG","title":"Login fails with uppercase email","severity":"MAJOR","stepsToReproduce":"Register with Alice@Mail.com and log in","estimateMinutes":240,"priority":"CRITICAL"}')
+  FREE=$(issue demo_dev2 '{"type":"TASK","title":"Write README","estimateMinutes":120,"priority":"LOW"}')
+  DONE=$(issue demo_dev '{"type":"TASK","title":"Set up Docker Compose","estimateMinutes":180,"priority":"MEDIUM"}')
 
   assign demo_lead "$STORY" "$DEV_PM"
   assign demo_lead "$TASK" "$DEV2_PM"
@@ -172,7 +176,15 @@ if echo "$BODY" | grep -q '"totalElements":0'; then
   comment demo_dev "$BUG" "Reproduced locally, fix is in review"
   comment demo_lead "$BUG" "Please add a regression test"
   comment demo_dev2 "$FREE" "I can take this next sprint"
-  echo "  6 issues with assignees, statuses and comments"
+  log_work demo_dev "$DONE" 150 6 "Compose file for Postgres and the app"
+  log_work demo_dev "$DONE" 60 5 "Health checks and docs"
+  log_work demo_dev "$BUG" 90 3 "Reproduced and wrote a failing test"
+  log_work demo_dev "$BUG" 120 2 "Normalized emails on login and registration"
+  log_work demo_dev "$STORY" 240 1 "Reset token model and email template"
+  log_work demo_dev "$STORY" 180 0 "Reset form and API"
+  log_work demo_dev2 "$TASK" 120 1 "Compared rate limiting libraries"
+  log_work demo_lead "$STORY" 45 0 "Reviewed the reset flow"
+  echo "  6 issues with assignees, statuses, comments, estimates and logged time"
 else
   echo "  issues already exist, skipped"
 fi

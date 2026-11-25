@@ -31,6 +31,7 @@ Login и refresh возвращают `accessToken` (1 час), `refreshToken` (
 | ✅ | PATCH | `/users/me` | токен | `updateProfile` — смена `username` (уникален без учёта регистра) |
 | ✅ | PUT | `/users/me/password` | токен | `changePassword` — проверка текущего пароля; после смены все старые access- и refresh-токены перестают работать |
 | ✅ | GET | `/users/me/issues?type=&status=&parentId=&q=&sortBy=&direction=&page=&size=` | токен | `getMyIssues` — мои задачи по всем организациям |
+| ✅ | GET | `/users/me/worklogs?from=&to=` | токен | `WorkLogService.getTimesheet` — мои списания времени за период (даты `YYYY-MM-DD`, не длиннее 92 дней) с организацией, проектом и задачей |
 | ⚪ | DELETE | `/users/me` | токен | удаление аккаунта (сначала решить, что с организациями, где он OWNER) |
 
 ## 3. Организации — `OrganizationController` / `OrganizationService`
@@ -56,6 +57,8 @@ Login и refresh возвращают `accessToken` (1 час), `refreshToken` (
 | ✅ | PATCH | `/{orgId}/members/{memberId}` | OWNER, ADMIN + правила | `updateRole` |
 | ✅ | DELETE | `/{orgId}/members/{memberId}` | OWNER, ADMIN + правила | `removeMember` |
 | ✅ | DELETE | `/{orgId}/members/me` | любой, кроме OWNER | `leaveOrganization` |
+| ✅ | PATCH | `/{orgId}/members/{memberId}/capacity` | OWNER, ADMIN | `WorkloadService.updateCapacity` — `weeklyCapacityMinutes` от 0 до 10080 (по умолчанию 2400 = 40 ч); поле есть в ответах списка участников |
+| ✅ | GET | `/{orgId}/workload?from=&to=` | OWNER, ADMIN | `WorkloadService.getOrganizationWorkload` — по каждому участнику организации: часы по дням и по проектам, ёмкость за период (рабочие дни × недельная ёмкость / 5), открытые назначенные задачи, задачи без оценки, оставшаяся оценка, флаг `overloaded` (остаток больше недельной ёмкости) |
 
 ## 5. Проекты — `ProjectController` / `ProjectService`
 
@@ -67,6 +70,7 @@ Login и refresh возвращают `accessToken` (1 час), `refreshToken` (
 | ✅ | PATCH | `/{orgId}/projects/{projectId}` | OWNER, ADMIN организации или ADMIN проекта | `updateProject` |
 | ✅ | PATCH | `/{orgId}/projects/{projectId}/status` | OWNER, ADMIN организации или ADMIN проекта | `changeStatus` |
 | ✅ | DELETE | `/{orgId}/projects/{projectId}` | OWNER | `deleteProject` |
+| ✅ | GET | `/{orgId}/projects/{projectId}/workload?from=&to=` | OWNER, ADMIN организации или ADMIN проекта | `WorkloadService.getProjectWorkload` — то же, что загрузка организации, но по участникам проекта и только по времени в этом проекте |
 | ✅ | GET | `/{orgId}/projects/{projectId}/activity?page=&size=` | участник проекта | `IssueService.getProjectActivity` — лента событий всех задач проекта, новые сверху, с названием и типом задачи |
 
 ## 5.1. Участники проекта — `ProjectMemberController` / `ProjectMemberService`
@@ -97,7 +101,9 @@ Login и refresh возвращают `accessToken` (1 час), `refreshToken` (
 | ✅ | PATCH | `/issues/{issueId}/parent` | `changeParent` — `parentId` обязателен |
 | ✅ | DELETE | `/issues/{issueId}/parent` | `detachFromEpic` — отвязать от Epic |
 | ✅ | DELETE | `/issues/{issueId}` | `deleteIssue` |
-| ✅ | GET | `/issues/{issueId}/history?page=&size=` | `getHistory` — CREATED, FIELD_CHANGED, STATUS_CHANGED, ASSIGNEE_CHANGED, PARENT_CHANGED со старым и новым значением и автором |
+| ✅ | GET | `/issues/{issueId}/history?page=&size=` | `getHistory` — CREATED, FIELD_CHANGED (в т.ч. `estimate`), STATUS_CHANGED, ASSIGNEE_CHANGED, PARENT_CHANGED, WORK_LOGGED со старым и новым значением и автором |
+
+**Оценка и время в задаче:** `estimateMinutes` (1…60000) передаётся при создании и в `PATCH /issues/{issueId}`; `0` убирает оценку. У Epic своей оценки нет (400): `estimateMinutes`, `spentMinutes` и `remainingMinutes` эпика считаются по его задачам. В ответе задачи: `estimateMinutes`, `spentMinutes` (сумма списаний), `remainingMinutes` (`max(оценка − списано, 0)` или `null` без оценки).
 
 ## 6.1. Комментарии — `IssueCommentController` / `IssueCommentService`
 
@@ -109,6 +115,19 @@ Login и refresh возвращают `accessToken` (1 час), `refreshToken` (
 | ✅ | GET | `/comments?page=&size=` | кто видит задачу | `getComments` |
 | ✅ | PATCH | `/comments/{commentId}` | только автор | `editComment` — ставит `editedAt` |
 | ✅ | DELETE | `/comments/{commentId}` | автор или ADMIN проекта | `deleteComment` |
+
+## 6.2. Учёт времени — `WorkLogController` / `WorkLogService`
+
+Путь: `/{orgId}/projects/{projectId}/issues/{issueId}/worklogs`.
+
+| | HTTP | Путь | Доступ | Метод сервиса |
+|---|---|---|---|---|
+| ✅ | POST | `/worklogs` | участник проекта (OWNER / ADMIN организации сначала добавляют себя в проект) | `addWorkLog` — `minutes` 1…1440, `workDate` не позже завтрашнего дня (UTC), `comment` до 500 символов; на Epic нельзя (400); всего за день у автора не больше 24 ч (400); пишет событие WORK_LOGGED |
+| ✅ | GET | `/worklogs?page=&size=` | кто видит задачу | `getWorkLogs` — новые по дате работы сверху |
+| ✅ | PATCH | `/worklogs/{workLogId}` | автор или ADMIN проекта | `updateWorkLog` — любые из `minutes`, `workDate`, `comment` (пустой `comment` удаляет его) |
+| ✅ | DELETE | `/worklogs/{workLogId}` | автор или ADMIN проекта | `deleteWorkLog` |
+
+В архивном проекте списания только читаются (409 на изменения).
 
 **Эффективная роль в проекте:** OWNER / ADMIN организации = ADMIN в любом проекте; иначе роль участника проекта; участник организации вне проекта — 403.
 

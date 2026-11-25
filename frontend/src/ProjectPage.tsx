@@ -1,4 +1,4 @@
-import { Bug, ChartColumn, CircleCheck, Columns3, List, ListTodo, Lock, Settings, Trash2, Users } from 'lucide-react'
+import { Bug, ChartColumn, CircleCheck, Columns3, Gauge, List, ListTodo, Lock, Settings, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import {
   api,
@@ -22,11 +22,13 @@ import { Select } from './Select'
 import type { ProjectTab } from './router'
 import { useAction, useResource } from './hooks'
 import { Empty, ErrorNotice, Loading, Pagination } from './ui'
+import { ProjectWorkload } from './Workload'
 
 const tabIcons: Record<ProjectTab, ReactNode> = {
   board: <Columns3 size={16} />,
   issues: <List size={16} />,
   overview: <ChartColumn size={16} />,
+  workload: <Gauge size={16} />,
   members: <Users size={16} />,
   settings: <Settings size={16} />,
 }
@@ -34,6 +36,7 @@ const tabLabels: Record<ProjectTab, string> = {
   board: 'Board',
   issues: 'Issues',
   overview: 'Overview',
+  workload: 'Workload',
   members: 'Members',
   settings: 'Settings',
 }
@@ -70,8 +73,11 @@ export function ProjectPage({
   )
   const ownMembership = user ? roster.value?.find(member => member.email === user.email) : undefined
   const noAccess = Boolean(!canManage && user && roster.value && !ownMembership)
+  const checkingAccess = !canManage && !roster.error && (!user || !roster.value)
   const projectAdmin = canManage || ownMembership?.role === 'ADMIN'
-  const tabs = noAccess ? [] : (Object.keys(tabLabels) as ProjectTab[]).filter(item => item !== 'settings' || projectAdmin)
+  const tabs = noAccess
+    ? []
+    : (Object.keys(tabLabels) as ProjectTab[]).filter(item => (item !== 'settings' && item !== 'workload') || projectAdmin)
 
   useEffect(() => {
     if (current) rememberProject({ id: current.id, organizationId: current.organizationId, title: current.title })
@@ -114,6 +120,14 @@ export function ProjectPage({
     </>
   )
 
+  if (checkingAccess)
+    return (
+      <>
+        {heading(null)}
+        <Loading />
+      </>
+    )
+
   if (noAccess)
     return (
       <>
@@ -145,6 +159,12 @@ export function ProjectPage({
     <>
       {heading(null)}
       {tab === 'overview' && <ProjectOverview project={current} openIssue={issue => onTab('issues', issue.id)} />}
+      {tab === 'workload' &&
+        (projectAdmin ? (
+          <ProjectWorkload project={current} />
+        ) : (
+          <Empty title="Only project admins and organization owners or admins can see the workload" icon={<Gauge size={22} />} />
+        ))}
       {tab === 'members' && (
         <ProjectMembers project={current} canManage={projectAdmin} selfId={canManage ? undefined : ownMembership?.id} />
       )}

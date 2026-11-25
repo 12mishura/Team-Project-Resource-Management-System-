@@ -10,6 +10,7 @@ public record OrganizationMemberResponse(
         String email,
         String username,
         OrganizationRole role,
+        int weeklyCapacityMinutes,
         Instant createdAt
 ) {
 }

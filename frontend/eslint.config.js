@@ -19,7 +19,7 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'jsx-a11y/no-autofocus': 'off',
-      'jsx-a11y/label-has-associated-control': ['error', { controlComponents: ['Select'], depth: 3 }],
+      'jsx-a11y/label-has-associated-control': ['error', { controlComponents: ['Select', 'DurationInput'], depth: 3 }],
       'jsx-a11y/no-static-element-interactions': ['error', { handlers: ['onClick', 'onMouseDown', 'onMouseUp', 'onKeyPress', 'onKeyUp'] }],
     },
   },

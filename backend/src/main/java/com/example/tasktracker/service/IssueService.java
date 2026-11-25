@@ -76,7 +76,7 @@ public class IssueService {
         if(request.parentId() != null){
             permissionChecker.checkCanChangeParent(actor);
         }
-        validateTypeSpecificFields(request.type(), request.severity(), request.stepsToReproduce(), request.storyPoints());
+        validateTypeSpecificFields(request.type(), request.severity(), request.stepsToReproduce(), request.storyPoints(), request.estimateMinutes());
         if(request.type() == IssueType.BUG && request.severity() == null){
             throw new InvalidIssueException("severity is required for BUG");
         }
@@ -178,7 +178,7 @@ public class IssueService {
         requireNotArchived(project);
         Issue issue = findIssue(projectId, issueId);
         permissionChecker.checkCanEdit(actor, issue);
-        validateTypeSpecificFields(issue.getType(), request.severity(), request.stepsToReproduce(), request.storyPoints());
+        validateTypeSpecificFields(issue.getType(), request.severity(), request.stepsToReproduce(), request.storyPoints(), request.estimateMinutes());
 
         Map<String, String> before = historyRecorder.snapshot(issue);
         issueMapper.toUpdate(request, issue);
@@ -337,7 +337,11 @@ public class IssueService {
         }
     }
 
-    private void validateTypeSpecificFields(IssueType type, BugSeverity severity, String stepsToReproduce, Integer storyPoints){
+    private void validateTypeSpecificFields(IssueType type, BugSeverity severity, String stepsToReproduce, Integer storyPoints,
+                                            Integer estimateMinutes){
+        if(type == IssueType.EPIC && estimateMinutes != null){
+            throw new InvalidIssueException("EPIC estimate is calculated from its issues");
+        }
         if(type != IssueType.BUG && (severity != null || stepsToReproduce != null)){
             throw new InvalidIssueException("severity and stepsToReproduce are only allowed for BUG");
         }

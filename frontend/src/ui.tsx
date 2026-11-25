@@ -194,6 +194,7 @@ export function Modal({ title, close, children }: { title: string; close: () => 
     const element = dialog.current
     if (!element) return
     element.showModal()
+    element.querySelector<HTMLElement>(':scope > form :is(input:not([type="hidden"]), textarea, [role="combobox"]):not(:disabled)')?.focus()
     return () => element.close()
   }, [])
   return (

@@ -12,6 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -73,6 +74,17 @@ public abstract class Issue {
     @Setter(AccessLevel.NONE)
     private Issue parent;
 
+    @Column(name = "estimate_minutes")
+    private Integer estimateMinutes;
+
+    @Setter(AccessLevel.NONE)
+    @Formula("(select coalesce(sum(w.minutes), 0) from work_logs w where w.issue_id = id or w.issue_id in (select c.id from issues c where c.parent_id = id))")
+    private long spentMinutes;
+
+    @Setter(AccessLevel.NONE)
+    @Formula("(select sum(c.estimate_minutes) from issues c where c.parent_id = id)")
+    private Integer childEstimateMinutes;
+
     @Version
     @Setter(AccessLevel.NONE)
     @Column(name = "version", nullable = false)
@@ -96,6 +108,15 @@ public abstract class Issue {
     }
 
     public abstract IssueType getType();
+
+    public Integer getTotalEstimateMinutes(){
+        return getType() == IssueType.EPIC ? childEstimateMinutes : estimateMinutes;
+    }
+
+    public Long getRemainingMinutes(){
+        Integer estimate = getTotalEstimateMinutes();
+        return estimate == null ? null : Math.max(estimate - spentMinutes, 0);
+    }
 
     public boolean canHaveParent(){
         return true;

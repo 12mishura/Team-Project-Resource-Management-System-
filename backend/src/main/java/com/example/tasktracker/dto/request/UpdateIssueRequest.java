@@ -12,7 +12,8 @@ public record UpdateIssueRequest(
         IssuePriority priority,
         BugSeverity severity,
         @Size(max = 5000) String stepsToReproduce,
-        @Min(0) @Max(100) Integer storyPoints
+        @Min(0) @Max(100) Integer storyPoints,
+        @Min(0) @Max(60000) Integer estimateMinutes
 ) {
     public UpdateIssueRequest {
         title = title == null ? null : title.strip();

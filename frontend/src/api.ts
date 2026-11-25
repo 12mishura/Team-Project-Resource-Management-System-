@@ -82,7 +82,65 @@ export interface Issue extends NamedRecord {
   severity: string | null
   stepsToReproduce: string | null
   storyPoints: number | null
+  estimateMinutes: number | null
+  spentMinutes: number
+  remainingMinutes: number | null
 }
+
+export interface WorkLog {
+  id: string
+  issueId: string
+  authorId: string
+  authorUsername: string
+  workDate: string
+  minutes: number
+  comment: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TimesheetEntry {
+  id: string
+  organizationId: string
+  organizationTitle: string
+  projectId: string
+  projectTitle: string
+  issueId: string
+  issueTitle: string
+  issueType: IssueType
+  issueStatus: IssueStatus
+  workDate: string
+  minutes: number
+  comment: string | null
+}
+
+export interface MemberWorkload {
+  organizationMemberId: string
+  userId: string
+  username: string
+  role: string
+  weeklyCapacityMinutes: number
+  capacityMinutes: number
+  loggedMinutes: number
+  openIssues: number
+  unestimatedIssues: number
+  remainingEstimateMinutes: number
+  overloaded: boolean
+  days: { date: string; minutes: number }[]
+  projects: { projectId: string; projectTitle: string; minutes: number }[]
+}
+
+export interface Workload {
+  from: string
+  to: string
+  workingDays: number
+  loggedMinutes: number
+  capacityMinutes: number
+  remainingEstimateMinutes: number
+  members: MemberWorkload[]
+}
+
+export type WorkLogFields = { minutes: number; workDate: string; comment?: string }
 
 export type ProjectMemberRole = 'ADMIN' | 'EXTENDED' | 'USER'
 
@@ -101,6 +159,7 @@ export interface OrganizationMember {
   email: string
   username: string
   role: OrganizationRole
+  weeklyCapacityMinutes: number
 }
 
 export interface Comment {
@@ -114,7 +173,7 @@ export interface Comment {
 
 export interface IssueEvent {
   id: string
-  type: 'CREATED' | 'FIELD_CHANGED' | 'STATUS_CHANGED' | 'ASSIGNEE_CHANGED' | 'PARENT_CHANGED'
+  type: 'CREATED' | 'FIELD_CHANGED' | 'STATUS_CHANGED' | 'ASSIGNEE_CHANGED' | 'PARENT_CHANGED' | 'WORK_LOGGED'
   field: string | null
   oldValue: string | null
   newValue: string | null
@@ -296,6 +355,7 @@ export type IssueFields = {
   severity?: string
   stepsToReproduce?: string
   storyPoints?: number
+  estimateMinutes?: number
 }
 
 async function listAll<T>(path: string, signal?: AbortSignal, filters: Record<string, string | undefined> = {}): Promise<T[]> {
@@ -390,4 +450,21 @@ export const api = {
   projectActivity: (project: Project, page: number, signal?: AbortSignal, size = 20) =>
     list<ProjectActivity>(projectPath(project.organizationId, project.id) + '/activity', page, {}, signal, size),
   history: (issue: IssueRef, page: number, signal?: AbortSignal) => list<IssueEvent>(issuePath(issue) + '/history', page, {}, signal),
+  workLogs: (issue: IssueRef, signal?: AbortSignal) => listAll<WorkLog>(issuePath(issue) + '/worklogs', signal),
+  logWork: (issue: IssueRef, body: WorkLogFields) => request<WorkLog>(issuePath(issue) + '/worklogs', { method: 'POST', body }),
+  updateWorkLog: (issue: IssueRef, workLog: WorkLog, body: Partial<WorkLogFields>) =>
+    request<WorkLog>(issuePath(issue) + '/worklogs/' + encodeURIComponent(workLog.id), { method: 'PATCH', body }),
+  deleteWorkLog: (issue: IssueRef, workLog: WorkLog) =>
+    request<void>(issuePath(issue) + '/worklogs/' + encodeURIComponent(workLog.id), { method: 'DELETE' }),
+  timesheet: (from: string, to: string, signal?: AbortSignal) =>
+    request<TimesheetEntry[]>(`/users/me/worklogs?${new URLSearchParams({ from, to })}`, { signal }),
+  projectWorkload: (project: Project, from: string, to: string, signal?: AbortSignal) =>
+    request<Workload>(`${projectPath(project.organizationId, project.id)}/workload?${new URLSearchParams({ from, to })}`, { signal }),
+  organizationWorkload: (id: string, from: string, to: string, signal?: AbortSignal) =>
+    request<Workload>(`${orgPath(id)}/workload?${new URLSearchParams({ from, to })}`, { signal }),
+  updateCapacity: (id: string, memberId: string, weeklyCapacityMinutes: number) =>
+    request<OrganizationMember>(orgPath(id) + '/members/' + encodeURIComponent(memberId) + '/capacity', {
+      method: 'PATCH',
+      body: { weeklyCapacityMinutes },
+    }),
 }

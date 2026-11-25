@@ -43,11 +43,13 @@ import {
   types,
   workflow,
 } from './labels'
-import { routePath } from './router'
+import { navigate, routePath } from './router'
 import { Avatar, PriorityIcon } from './bits'
 import { Select } from './Select'
 import { useAction, useResource } from './hooks'
 import { Empty, ErrorNotice, Loading, Modal, Pagination } from './ui'
+import { EstimateField, LogTimeDialog, TimeSummary, WorkLogList } from './TimeTracking'
+import { formatDuration, readDuration } from './time'
 
 type SortField = 'CREATED_AT' | 'UPDATED_AT' | 'PRIORITY' | 'STATUS'
 type Sort = { field: SortField; direction: 'ASC' | 'DESC' }
@@ -483,6 +485,14 @@ function IssueBoard({
                   <span className="ticket-footer">
                     <span className="ticket-tags">
                       <PriorityIcon priority={issue.priority} />
+                      {(issue.estimateMinutes !== null || issue.spentMinutes > 0) && (
+                        <span
+                          className="chip time-chip"
+                          data-over={(issue.estimateMinutes !== null && issue.spentMinutes > issue.estimateMinutes) || undefined}
+                          title={`Logged ${formatDuration(issue.spentMinutes)} of ${formatDuration(issue.estimateMinutes, 'no estimate')}`}>
+                          {formatDuration(issue.spentMinutes)} / {formatDuration(issue.estimateMinutes, '?')}
+                        </span>
+                      )}
                       {issue.storyPoints !== null && (
                         <span className="chip" title="Story points">
                           {issue.storyPoints} SP
@@ -648,6 +658,7 @@ function IssueEditor({
         : {}),
       ...(type === 'STORY' && points ? { storyPoints: Number(points) } : {}),
     }
+    const estimate = type === 'EPIC' ? null : readDuration(fields, 'estimate')
     if (!issue) {
       const assigneeId = String(fields.get('assignee') ?? '')
       const parentId = String(fields.get('epic') ?? '')
@@ -660,6 +671,7 @@ function IssueEditor({
             stepsToReproduce: values.stepsToReproduce || undefined,
             assigneeId: assigneeId || undefined,
             parentId: type !== 'EPIC' && parentId ? parentId : undefined,
+            estimateMinutes: estimate ?? undefined,
           }),
         ),
       )
@@ -675,6 +687,7 @@ function IssueEditor({
     }
     if (type === 'STORY' && values.storyPoints !== undefined && values.storyPoints !== issue.storyPoints)
       changes.storyPoints = values.storyPoints
+    if (type !== 'EPIC' && estimate !== issue.estimateMinutes) changes.estimateMinutes = estimate ?? 0
     if (!Object.keys(changes).length) {
       close()
       return
@@ -751,6 +764,7 @@ function IssueEditor({
               />
             </label>
           )}
+          {type !== 'EPIC' && <EstimateField issue={issue} />}
           {type === 'BUG' && (
             <label>
               Severity
@@ -853,7 +867,8 @@ function IssueDetailBody({
   changed: () => void
   setRecord: (record: Issue) => void
 }) {
-  const [tab, setTab] = useState<'comments' | 'history'>('comments')
+  const [tab, setTab] = useState<'comments' | 'history' | 'time'>('comments')
+  const [loggingTime, setLoggingTime] = useState(false)
   const [editing, setEditing] = useState(false)
   const [revision, setRevision] = useState(0)
   const access = useProjectAccess(issueProject, organization, user, true)
@@ -870,6 +885,11 @@ function IssueDetailBody({
   const canTakeIssue =
     mutable && Boolean(access.member) && record.assigneeId !== access.member?.id && (access.extended || !record.assigneeId)
   const mustJoinToTake = mutable && access.admin && Boolean(access.roster.value) && !access.member
+  const canLogTime = mutable && Boolean(access.member) && record.type !== 'EPIC'
+
+  function refreshTime() {
+    void changes.run(async () => apply(await api.issue(ref)))
+  }
   const epics = useEpics(issueProject, canChangeParent || Boolean(record.parentId))
   const epicTitle = record.parentId ? epics.value?.find(epic => epic.id === record.parentId)?.title : undefined
 
@@ -1080,6 +1100,16 @@ function IssueDetailBody({
         {mustJoinToTake && (
           <p className="muted small-text">To assign issues to yourself, first add yourself to this project on the Members tab.</p>
         )}
+        <TimeSummary
+          issue={record}
+          canLog={canLogTime}
+          onLog={() => setLoggingTime(true)}
+          onJoin={
+            mustJoinToTake && record.type !== 'EPIC'
+              ? () => navigate({ name: 'project', orgId: organizationId, projectId, tab: 'members' })
+              : undefined
+          }
+        />
         {record.stepsToReproduce && (
           <div className="detail-field">
             Steps to reproduce<p>{record.stepsToReproduce}</p>
@@ -1093,14 +1123,38 @@ function IssueDetailBody({
           <button aria-pressed={tab === 'comments'} onClick={() => setTab('comments')}>
             Comments
           </button>
+          {record.type !== 'EPIC' && (
+            <button aria-pressed={tab === 'time'} onClick={() => setTab('time')}>
+              Work log
+            </button>
+          )}
           <button aria-pressed={tab === 'history'} onClick={() => setTab('history')}>
             History
           </button>
         </div>
         {tab === 'comments' ? (
           <Comments issue={ref} mutable={mutable} userId={user?.id} admin={access.admin} />
+        ) : tab === 'time' && record.type !== 'EPIC' ? (
+          <WorkLogList
+            key={revision}
+            issue={{ ...ref, title: record.title }}
+            mutable={mutable}
+            userId={user?.id}
+            admin={access.admin}
+            changed={refreshTime}
+          />
         ) : (
           <History key={revision} issue={ref} project={issueProject} />
+        )}
+        {loggingTime && (
+          <LogTimeDialog
+            issue={{ ...ref, title: record.title }}
+            close={() => setLoggingTime(false)}
+            saved={() => {
+              setLoggingTime(false)
+              refreshTime()
+            }}
+          />
         )}
       </div>
     </Modal>

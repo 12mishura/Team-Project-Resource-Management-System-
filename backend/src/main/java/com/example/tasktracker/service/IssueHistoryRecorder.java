@@ -6,6 +6,7 @@ import com.example.tasktracker.domain.IssueEvent;
 import com.example.tasktracker.domain.Story;
 import com.example.tasktracker.domain.User;
 import com.example.tasktracker.domain.enums.IssueEventType;
+import com.example.tasktracker.domain.enums.IssueType;
 import com.example.tasktracker.repository.IssueEventRepository;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -31,11 +32,18 @@ public class IssueHistoryRecorder {
         }
     }
 
+    public void recordWorkLogged(Issue issue, User actor, int minutes){
+        save(issue, actor, new IssueEvent(IssueEventType.WORK_LOGGED, "time", null, String.valueOf(minutes)));
+    }
+
     public Map<String, String> snapshot(Issue issue){
         Map<String, String> fields = new LinkedHashMap<>();
         fields.put("title", issue.getTitle());
         fields.put("description", issue.getDescription());
         fields.put("priority", text(issue.getPriority()));
+        if(issue.getType() != IssueType.EPIC){
+            fields.put("estimate", text(issue.getEstimateMinutes()));
+        }
         if(issue instanceof Bug bug){
             fields.put("severity", text(bug.getSeverity()));
             fields.put("stepsToReproduce", bug.getStepsToReproduce());

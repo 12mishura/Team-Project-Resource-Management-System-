@@ -81,8 +81,8 @@ class IssueMapperTest {
         Story story = prepare(new Story("Story", "Old", IssuePriority.LOW, 1));
         Bug bug = prepare(new Bug("Bug", null, null, BugSeverity.MINOR, null));
 
-        mapper.toUpdate(new UpdateIssueRequest(null, "New", null, null, null, 13), story);
-        mapper.toUpdate(new UpdateIssueRequest("Renamed bug", null, IssuePriority.HIGH, BugSeverity.BLOCKER, "Steps", null), bug);
+        mapper.toUpdate(new UpdateIssueRequest(null, "New", null, null, null, 13, null), story);
+        mapper.toUpdate(new UpdateIssueRequest("Renamed bug", null, IssuePriority.HIGH, BugSeverity.BLOCKER, "Steps", null, null), bug);
 
         assertThat(story.getTitle()).isEqualTo("Story");
         assertThat(story.getDescription()).isEqualTo("New");
@@ -125,6 +125,6 @@ class IssueMapperTest {
     }
 
     private static CreateIssueRequest create(IssueType type, BugSeverity severity, String steps, Integer points) {
-        return new CreateIssueRequest(type, "Title", null, IssuePriority.HIGH, severity, steps, points, null, null);
+        return new CreateIssueRequest(type, "Title", null, IssuePriority.HIGH, severity, steps, points, null, null, null);
     }
 }

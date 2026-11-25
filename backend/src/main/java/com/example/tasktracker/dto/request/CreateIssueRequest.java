@@ -20,7 +20,8 @@ public record CreateIssueRequest(
         @Size(max = 5000) String stepsToReproduce,
         @Min(0) @Max(100) Integer storyPoints,
         UUID parentId,
-        UUID assigneeId
+        UUID assigneeId,
+        @Min(1) @Max(60000) Integer estimateMinutes
 ) {
     public CreateIssueRequest {
         title = title == null ? null : title.strip();

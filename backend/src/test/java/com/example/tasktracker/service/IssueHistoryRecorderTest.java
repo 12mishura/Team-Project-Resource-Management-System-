@@ -1,6 +1,7 @@
 package com.example.tasktracker.service;
 
 import com.example.tasktracker.domain.Bug;
+import com.example.tasktracker.domain.Epic;
 import com.example.tasktracker.domain.IssueEvent;
 import com.example.tasktracker.domain.Story;
 import com.example.tasktracker.domain.Task;
@@ -29,7 +30,8 @@ class IssueHistoryRecorderTest {
     @Test
     void snapshotContainsOnlyFieldsOfIssueType() {
         assertThat(recorder.snapshot(new Task("Task", null, IssuePriority.LOW)).keySet())
-                .containsExactly("title", "description", "priority");
+                .containsExactly("title", "description", "priority", "estimate");
+        assertThat(recorder.snapshot(new Epic("Epic", null, null))).doesNotContainKey("estimate");
         assertThat(recorder.snapshot(new Story("Story", null, null, 5)))
                 .containsEntry("storyPoints", "5").doesNotContainKey("severity");
         assertThat(recorder.snapshot(new Bug("Bug", null, null, BugSeverity.MAJOR, "Steps")))

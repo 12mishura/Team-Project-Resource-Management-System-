@@ -19,6 +19,8 @@ import java.util.UUID;
 @Getter @Setter
 @NoArgsConstructor
 public class OrganizationMember {
+    public static final int DEFAULT_WEEKLY_CAPACITY_MINUTES = 2400;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -35,6 +37,9 @@ public class OrganizationMember {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @Column(name = "weekly_capacity_minutes", nullable = false)
+    private int weeklyCapacityMinutes = DEFAULT_WEEKLY_CAPACITY_MINUTES;
 
     @CreationTimestamp
     @Setter(AccessLevel.NONE)

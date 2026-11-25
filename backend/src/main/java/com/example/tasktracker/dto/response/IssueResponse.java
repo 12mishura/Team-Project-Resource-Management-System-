@@ -25,6 +25,9 @@ public record IssueResponse(
         BugSeverity severity,
         String stepsToReproduce,
         Integer storyPoints,
+        Integer estimateMinutes,
+        long spentMinutes,
+        Long remainingMinutes,
         Long version,
         Instant createdAt,
         Instant updatedAt

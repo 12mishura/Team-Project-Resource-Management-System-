@@ -61,7 +61,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler({OrganizationNotFoundException.class, UserNotFoundException.class,
             InviteCodeNotExistsException.class, MemberNotFoundException.class, ProjectNotFoundException.class,
             ProjectMemberNotFoundException.class, IssueNotFoundException.class,
-            CommentNotFoundException.class})
+            CommentNotFoundException.class, WorkLogNotFoundException.class})
     public ProblemDetail handleNotFound(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
@@ -72,7 +72,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
-    @ExceptionHandler({InvalidIssueException.class, InvalidPasswordException.class})
+    @ExceptionHandler({InvalidIssueException.class, InvalidPasswordException.class, InvalidWorkLogException.class})
     public ProblemDetail handleBadRequest(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }
