@@ -38,6 +38,7 @@ public class OrganizationMemberService {
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
     private final OrganizationPermissionChecker permissionChecker;
+    private final AssignmentReleaser assignmentReleaser;
 
     @Transactional
     public OrganizationMemberResponse joinToOrganization(JoinOrganizationRequest request, String email){
@@ -84,6 +85,7 @@ public class OrganizationMemberService {
         } else {
             permissionChecker.checkCanRemove(actor, target);
         }
+        assignmentReleaser.releaseOrganizationMember(target, actor.getUser());
         organizationMemberRepository.delete(target);
     }
 
@@ -91,6 +93,7 @@ public class OrganizationMemberService {
     public void leaveOrganization(UUID organizationId, String email){
         OrganizationMember actor = permissionChecker.requireMember(organizationId, email);
         permissionChecker.checkCanLeave(actor);
+        assignmentReleaser.releaseOrganizationMember(actor, actor.getUser());
         organizationMemberRepository.delete(actor);
     }
 

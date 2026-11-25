@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ApiError } from './api'
+import { addDays, startOfWeek, today } from './time'
 
 export const message = (error: unknown) => (error instanceof ApiError ? error.message : 'Could not reach the server. Please try again.')
 
@@ -55,3 +56,31 @@ export function useAction() {
   }
   return { run, busy, error }
 }
+
+export type Span = 'week' | 'month'
+const spanDays: Record<Span, number> = { week: 7, month: 28 }
+
+export function usePeriod(initialSpan: Span = 'week') {
+  const [span, setSpan] = useState<Span>(initialSpan)
+  const [anchor, setAnchor] = useState(() => startOfWeek(today()))
+  const length = spanDays[span]
+  const from = span === 'week' ? anchor : addDays(anchor, -21)
+  const to = addDays(from, length - 1)
+  return {
+    span,
+    from,
+    to,
+    setSpan,
+    previous: () => setAnchor(current => addDays(current, -length)),
+    next: () =>
+      setAnchor(current => {
+        const latest = startOfWeek(today())
+        const moved = addDays(current, length)
+        return moved > latest ? latest : moved
+      }),
+    reset: () => setAnchor(startOfWeek(today())),
+    isCurrent: anchor >= startOfWeek(today()),
+  }
+}
+
+export type Period = ReturnType<typeof usePeriod>

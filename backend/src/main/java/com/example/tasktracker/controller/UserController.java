@@ -11,6 +11,11 @@ import com.example.tasktracker.dto.response.PageResponse;
 import com.example.tasktracker.dto.response.UserResponse;
 import com.example.tasktracker.service.IssueService;
 import com.example.tasktracker.service.UserService;
+import com.example.tasktracker.service.WorkLogService;
+import com.example.tasktracker.dto.response.TimesheetEntryResponse;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
+import java.util.List;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -28,6 +33,7 @@ import java.util.UUID;
 public class UserController {
     private final IssueService issueService;
     private final UserService userService;
+    private final WorkLogService workLogService;
 
     @PatchMapping
     public UserResponse updateProfile(@Valid @RequestBody UpdateProfileRequest request,
@@ -53,5 +59,12 @@ public class UserController {
                                                    @AuthenticationPrincipal UserDetails userDetails){
         IssueFilter filter = new IssueFilter(type, status, null, parentId, q, sortBy, direction);
         return issueService.getMyIssues(userDetails.getUsername(), filter, pageable);
+    }
+
+    @GetMapping("/worklogs")
+    public List<TimesheetEntryResponse> getTimesheet(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                                     @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                                     @AuthenticationPrincipal UserDetails userDetails){
+        return workLogService.getTimesheet(userDetails.getUsername(), from, to);
     }
 }

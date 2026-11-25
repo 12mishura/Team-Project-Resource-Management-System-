@@ -4,6 +4,7 @@ import com.example.tasktracker.domain.Issue;
 import com.example.tasktracker.domain.IssueComment;
 import com.example.tasktracker.domain.OrganizationMember;
 import com.example.tasktracker.domain.ProjectMember;
+import com.example.tasktracker.domain.WorkLog;
 import com.example.tasktracker.domain.enums.IssueType;
 import com.example.tasktracker.domain.enums.OrganizationRole;
 import com.example.tasktracker.domain.enums.ProjectMemberRole;
@@ -109,6 +110,18 @@ public class ProjectPermissionChecker {
     public void checkCanDeleteComment(ProjectActor actor, IssueComment comment){
         if(!actor.isAtLeast(ProjectMemberRole.ADMIN) && !comment.getAuthor().getId().equals(actor.userId())){
             throw new IllegalIssueOperationException("Only the author or project ADMIN can delete this comment");
+        }
+    }
+
+    public void checkCanLogWork(ProjectActor actor){
+        if(actor.projectMember() == null){
+            throw new IllegalIssueOperationException("Add yourself to the project before logging time");
+        }
+    }
+
+    public void checkCanChangeWorkLog(ProjectActor actor, WorkLog workLog){
+        if(!actor.isAtLeast(ProjectMemberRole.ADMIN) && !workLog.getAuthor().getId().equals(actor.userId())){
+            throw new IllegalIssueOperationException("Only the author or project ADMIN can change this work log");
         }
     }
 

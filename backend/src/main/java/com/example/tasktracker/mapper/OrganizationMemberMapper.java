@@ -14,6 +14,7 @@ public class OrganizationMemberMapper {
                 member.getUser().getEmail(),
                 member.getUser().getUsername(),
                 member.getRole(),
+                member.getWeeklyCapacityMinutes(),
                 member.getCreatedAt()
         );
     }

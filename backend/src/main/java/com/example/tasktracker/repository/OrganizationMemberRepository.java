@@ -1,5 +1,6 @@
 package com.example.tasktracker.repository;
 
+import java.util.List;
 import com.example.tasktracker.domain.OrganizationMember;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -33,4 +34,12 @@ public interface OrganizationMemberRepository extends JpaRepository<Organization
     Page<OrganizationMember> findAllByUserEmail(String email, Pageable pageable);
 
     long countByOrganizationId(UUID organizationId);
+
+    @Query("""
+            select m from OrganizationMember m
+            join fetch m.user
+            where m.organization.id = :organizationId
+            order by m.createdAt, m.id
+            """)
+    List<OrganizationMember> findAllWithUsersByOrganizationId(@Param("organizationId") UUID organizationId);
 }

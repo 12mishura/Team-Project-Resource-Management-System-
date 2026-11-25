@@ -35,6 +35,7 @@ public class ProjectMemberService {
     private final ProjectRepository projectRepository;
     private final OrganizationMemberRepository organizationMemberRepository;
     private final ProjectPermissionChecker permissionChecker;
+    private final AssignmentReleaser assignmentReleaser;
 
     @OrganizationAccess
     @Transactional
@@ -83,6 +84,7 @@ public class ProjectMemberService {
         ProjectMember member = findMember(organizationId, projectId, projectMemberId);
         ProjectActor actor = permissionChecker.requireProjectAdmin(organizationId, projectId, email);
         permissionChecker.checkCanChangeMembership(actor, member);
+        assignmentReleaser.releaseProjectMember(member, actor.organizationMember().getUser());
         projectMemberRepository.delete(member);
     }
 

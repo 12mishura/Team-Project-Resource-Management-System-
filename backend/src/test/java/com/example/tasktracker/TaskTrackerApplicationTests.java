@@ -25,6 +25,6 @@ class TaskTrackerApplicationTests extends AbstractIntegrationTest {
     void migrationsAreApplied() {
         Integer applied = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success", Integer.class);
-        assertThat(applied).isEqualTo(10);
+        assertThat(applied).isEqualTo(11);
     }
 }

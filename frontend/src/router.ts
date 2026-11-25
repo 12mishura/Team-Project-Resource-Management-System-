@@ -1,19 +1,20 @@
 import { useSyncExternalStore } from 'react'
 import type { IssueRef } from './api'
 
-export type OrgSection = 'projects' | 'members' | 'settings'
-export type ProjectTab = 'board' | 'issues' | 'overview' | 'members' | 'settings'
+export type OrgSection = 'projects' | 'members' | 'workload' | 'settings'
+export type ProjectTab = 'board' | 'issues' | 'overview' | 'workload' | 'members' | 'settings'
 
 export type Route =
   | { name: 'home' }
   | { name: 'organizations' }
   | { name: 'profile' }
+  | { name: 'timesheet' }
   | { name: 'mine'; issue?: IssueRef }
   | { name: 'org'; orgId: string; section: OrgSection }
   | { name: 'project'; orgId: string; projectId: string; tab: ProjectTab; issueId?: string }
 
-const orgSections: OrgSection[] = ['projects', 'members', 'settings']
-const projectTabs: ProjectTab[] = ['board', 'issues', 'overview', 'members', 'settings']
+const orgSections: OrgSection[] = ['projects', 'members', 'workload', 'settings']
+const projectTabs: ProjectTab[] = ['board', 'issues', 'overview', 'workload', 'members', 'settings']
 
 const listeners = new Set<() => void>()
 const notify = () => listeners.forEach(listener => listener())
@@ -46,6 +47,7 @@ export function parseRoute(location: string): Route {
 
   if (parts.length === 0) return { name: 'home' }
   if (section === 'profile' && parts.length === 1) return { name: 'profile' }
+  if (section === 'timesheet' && parts.length === 1) return { name: 'timesheet' }
   if (section === 'organizations' && parts.length === 1) return { name: 'organizations' }
   if (section === 'my-issues') {
     if (parts.length === 1) return { name: 'mine' }
@@ -81,6 +83,8 @@ export function routePath(route: Route): string {
       return '/organizations'
     case 'profile':
       return '/profile'
+    case 'timesheet':
+      return '/timesheet'
     case 'mine':
       return route.issue ? segment('my-issues', route.issue.organizationId, route.issue.projectId, route.issue.id) : '/my-issues'
     case 'org':

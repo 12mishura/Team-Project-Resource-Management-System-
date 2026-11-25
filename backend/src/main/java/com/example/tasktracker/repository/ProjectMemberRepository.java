@@ -32,4 +32,13 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, UU
             where pm.project.organization.id = :organizationId
             order by pm.createdAt, pm.id""")
     List<ProjectMemberName> findMemberNamesByOrganizationId(@Param("organizationId") UUID organizationId);
+
+    @Query("""
+            select pm from ProjectMember pm
+            join fetch pm.organizationMember om
+            join fetch om.user
+            where pm.project.id = :projectId
+            order by pm.createdAt, pm.id
+            """)
+    List<ProjectMember> findAllWithUsersByProjectId(@Param("projectId") UUID projectId);
 }

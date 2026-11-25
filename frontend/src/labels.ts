@@ -9,6 +9,7 @@ import type {
   ProjectMemberRole,
   ProjectStatus,
 } from './api'
+import { formatDuration } from './time'
 
 export const organizationRoles: Record<OrganizationRole, string> = { OWNER: 'Owner', ADMIN: 'Administrator', USER: 'Member' }
 export const projectRoles: Record<ProjectMemberRole, string> = { ADMIN: 'Admin', EXTENDED: 'Extended', USER: 'User' }
@@ -40,6 +41,7 @@ export const eventNames: Record<IssueEvent['type'], string> = {
   STATUS_CHANGED: 'Status changed',
   ASSIGNEE_CHANGED: 'Assignee changed',
   PARENT_CHANGED: 'Epic changed',
+  WORK_LOGGED: 'Time logged',
 }
 export const fieldNames: Record<string, string> = {
   title: 'Title',
@@ -51,6 +53,8 @@ export const fieldNames: Record<string, string> = {
   status: 'Status',
   assignee: 'Assignee',
   parent: 'Epic',
+  estimate: 'Estimate',
+  time: 'Time',
 }
 
 const valueLabels: Record<string, Record<string, string>> = {
@@ -60,6 +64,7 @@ const valueLabels: Record<string, Record<string, string>> = {
 }
 
 export function fieldValue(field: string | null, value: string) {
+  if ((field === 'estimate' || field === 'time') && /^d+$/.test(value)) return formatDuration(Number(value))
   return (field && valueLabels[field]?.[value]) ?? value
 }
 
@@ -88,6 +93,7 @@ export function describeActivity(item: ProjectActivity): [string, string] {
   if (item.type === 'CREATED') return [`created ${types[item.issueType].toLowerCase()}`, '']
   if (item.type === 'FIELD_CHANGED' && item.field) return [`changed ${(fieldNames[item.field] ?? item.field).toLowerCase()} of`, '']
   if (item.type === 'STATUS_CHANGED' && item.newValue) return ['moved', `to ${fieldValue('status', item.newValue)}`]
+  if (item.type === 'WORK_LOGGED' && item.newValue) return [`logged ${fieldValue('time', item.newValue)} on`, '']
   if (item.type === 'ASSIGNEE_CHANGED') return item.newValue ? ['assigned', `to ${item.newValue}`] : ['removed the assignee of', '']
   return ['changed the epic of', '']
 }

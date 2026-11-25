@@ -2,10 +2,12 @@ import {
   ArrowRight,
   Bug,
   Building2,
+  CalendarClock,
   CircleCheck,
   ClipboardList,
   Folder,
   FolderPlus,
+  Gauge,
   House,
   LogOut,
   Menu as MenuIcon,
@@ -40,6 +42,8 @@ const ProjectPage = lazy(() => import('./ProjectPage').then(module => ({ default
 const UserProfile = lazy(() => import('./Profiles').then(module => ({ default: module.UserProfile })))
 const OrganizationMembers = lazy(() => import('./Profiles').then(module => ({ default: module.OrganizationMembers })))
 const OrganizationSettings = lazy(() => import('./Profiles').then(module => ({ default: module.OrganizationSettings })))
+const Timesheet = lazy(() => import('./Timesheet').then(module => ({ default: module.Timesheet })))
+const OrganizationWorkload = lazy(() => import('./Workload').then(module => ({ default: module.OrganizationWorkload })))
 
 const canManage = (organization: Organization) => organization.role !== 'USER'
 
@@ -132,21 +136,20 @@ function Workspace({ logout, onPasswordChanged }: { logout: () => void; onPasswo
         ? [{ label: 'My issues' }]
         : route.name === 'profile'
           ? [{ label: 'Your profile' }]
-          : route.name === 'organizations'
-            ? [{ label: 'Organizations' }]
-            : route.name === 'org'
-              ? [
-                  ...(orgCrumb ? [orgCrumb] : []),
-                  { label: route.section === 'projects' ? 'Projects' : route.section === 'members' ? 'Members' : 'Settings' },
-                ]
-              : [
-                  ...(orgCrumb ? [orgCrumb, { label: 'Projects', route: orgCrumb.route }] : []),
-                  {
-                    label: projectTitle ?? 'Project',
-                    route: { name: 'project', orgId: route.orgId, projectId: route.projectId, tab: 'board' },
-                  },
-                  { label: route.tab[0].toUpperCase() + route.tab.slice(1) },
-                ]
+          : route.name === 'timesheet'
+            ? [{ label: 'Timesheet' }]
+            : route.name === 'organizations'
+              ? [{ label: 'Organizations' }]
+              : route.name === 'org'
+                ? [...(orgCrumb ? [orgCrumb] : []), { label: route.section[0].toUpperCase() + route.section.slice(1) }]
+                : [
+                    ...(orgCrumb ? [orgCrumb, { label: 'Projects', route: orgCrumb.route }] : []),
+                    {
+                      label: projectTitle ?? 'Project',
+                      route: { name: 'project', orgId: route.orgId, projectId: route.projectId, tab: 'board' },
+                    },
+                    { label: route.tab[0].toUpperCase() + route.tab.slice(1) },
+                  ]
 
   return (
     <div className="workspace">
@@ -176,6 +179,7 @@ function Workspace({ logout, onPasswordChanged }: { logout: () => void; onPasswo
             <span className="nav-section">For you</span>
             {navItem('Home', <House size={17} />, { name: 'home' }, route.name === 'home')}
             {navItem('My issues', <ClipboardList size={17} />, { name: 'mine' }, route.name === 'mine')}
+            {navItem('Timesheet', <CalendarClock size={17} />, { name: 'timesheet' }, route.name === 'timesheet')}
             {organization && (
               <>
                 <span className="nav-section">{organization.title}</span>
@@ -191,6 +195,13 @@ function Workspace({ logout, onPasswordChanged }: { logout: () => void; onPasswo
                   { name: 'org', orgId, section: 'members' },
                   route.name === 'org' && route.section === 'members',
                 )}
+                {canManage(organization) &&
+                  navItem(
+                    'Workload',
+                    <Gauge size={17} />,
+                    { name: 'org', orgId, section: 'workload' },
+                    route.name === 'org' && route.section === 'workload',
+                  )}
                 {navItem(
                   'Settings',
                   <Settings size={17} />,
@@ -287,6 +298,7 @@ function Workspace({ logout, onPasswordChanged }: { logout: () => void; onPasswo
                 openIssue={issue => navigate({ name: 'mine', issue })}
                 openOrganization={openOrganization}
                 openMyIssues={() => navigate({ name: 'mine' })}
+                openTimesheet={() => navigate({ name: 'timesheet' })}
                 openProject={(organizationId, projectId) => navigate({ name: 'project', orgId: organizationId, projectId, tab: 'board' })}
                 openProjectIssue={(organizationId, projectId, issueId) =>
                   navigate({ name: 'project', orgId: organizationId, projectId, tab: 'issues', issueId })
@@ -315,6 +327,19 @@ function Workspace({ logout, onPasswordChanged }: { logout: () => void; onPasswo
               ) : (
                 profile.loading && <Loading />
               ))}
+            {route.name === 'timesheet' && (
+              <Timesheet
+                openIssue={issue =>
+                  navigate({
+                    name: 'project',
+                    orgId: issue.organizationId,
+                    projectId: issue.projectId,
+                    tab: 'issues',
+                    issueId: issue.issueId,
+                  })
+                }
+              />
+            )}
             {route.name === 'organizations' && (
               <>
                 <header className="page-heading">
@@ -376,6 +401,9 @@ function Workspace({ logout, onPasswordChanged }: { logout: () => void; onPasswo
             )}
             {route.name === 'org' && organization && route.section === 'members' && (
               <OrganizationMembers key={orgId} organization={organization} onMembershipChanged={organizations.reload} />
+            )}
+            {route.name === 'org' && organization && route.section === 'workload' && (
+              <OrganizationWorkload key={orgId} organization={organization} />
             )}
             {route.name === 'org' && organization && route.section === 'settings' && (
               <OrganizationSettings

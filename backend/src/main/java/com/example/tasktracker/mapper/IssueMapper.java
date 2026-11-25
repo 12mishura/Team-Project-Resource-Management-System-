@@ -35,6 +35,9 @@ public class IssueMapper {
                 bug == null ? null : bug.getSeverity(),
                 bug == null ? null : bug.getStepsToReproduce(),
                 story == null ? null : story.getStoryPoints(),
+                issue.getTotalEstimateMinutes(),
+                issue.getSpentMinutes(),
+                issue.getRemainingMinutes(),
                 issue.getVersion(),
                 issue.getCreatedAt(),
                 issue.getUpdatedAt()
@@ -42,13 +45,15 @@ public class IssueMapper {
     }
 
     public Issue toEntity(CreateIssueRequest request){
-        return switch (request.type()) {
+        Issue issue = switch (request.type()) {
             case EPIC -> new Epic(request.title(), request.description(), request.priority());
             case STORY -> new Story(request.title(), request.description(), request.priority(), request.storyPoints());
             case TASK -> new Task(request.title(), request.description(), request.priority());
             case BUG -> new Bug(request.title(), request.description(), request.priority(),
                     request.severity(), request.stepsToReproduce());
         };
+        issue.setEstimateMinutes(request.estimateMinutes());
+        return issue;
     }
 
     public Issue toUpdate(UpdateIssueRequest request, Issue issue){
@@ -68,6 +73,9 @@ public class IssueMapper {
             if(request.stepsToReproduce() != null){
                 bug.setStepsToReproduce(request.stepsToReproduce());
             }
+        }
+        if(request.estimateMinutes() != null){
+            issue.setEstimateMinutes(request.estimateMinutes() == 0 ? null : request.estimateMinutes());
         }
         if(issue instanceof Story story && request.storyPoints() != null){
             story.setStoryPoints(request.storyPoints());

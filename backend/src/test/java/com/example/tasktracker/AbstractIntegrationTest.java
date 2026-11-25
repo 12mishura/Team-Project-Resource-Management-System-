@@ -36,7 +36,7 @@ public abstract class AbstractIntegrationTest {
 
     @BeforeEach
     void cleanDatabase() {
-        jdbcTemplate.execute("TRUNCATE TABLE refresh_tokens, issue_events, issue_comments, issues, project_members, projects, organization_members, organization, users CASCADE");
+        jdbcTemplate.execute("TRUNCATE TABLE refresh_tokens, work_logs, issue_events, issue_comments, issues, project_members, projects, organization_members, organization, users CASCADE");
     }
 
     protected ResultActions register(String email, String username, String password) throws Exception {

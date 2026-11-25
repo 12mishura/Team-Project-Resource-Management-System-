@@ -5,5 +5,6 @@ public enum IssueEventType {
     FIELD_CHANGED,
     STATUS_CHANGED,
     ASSIGNEE_CHANGED,
-    PARENT_CHANGED
+    PARENT_CHANGED,
+    WORK_LOGGED
 }

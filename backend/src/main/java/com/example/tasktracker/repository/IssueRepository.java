@@ -2,6 +2,7 @@ package com.example.tasktracker.repository;
 
 import com.example.tasktracker.domain.Issue;
 import com.example.tasktracker.domain.enums.IssueStatus;
+import com.example.tasktracker.domain.enums.ProjectStatus;
 import com.example.tasktracker.repository.projection.ProjectCount;
 import com.example.tasktracker.repository.projection.ProjectStatusCount;
 import org.springframework.data.domain.Page;
@@ -50,4 +51,25 @@ public interface IssueRepository extends JpaRepository<Issue, UUID>, JpaSpecific
     List<ProjectCount> countOpenAssignedByProject(@Param("organizationId") UUID organizationId,
                                                    @Param("email") String email,
                                                    @Param("closed") IssueStatus closed);
+
+    @Query("""
+            select i from Issue i
+            join fetch i.assignee a
+            where i.project.id = :projectId and i.status <> :closed
+            """)
+    List<Issue> findOpenAssignedByProject(@Param("projectId") UUID projectId, @Param("closed") IssueStatus closed);
+
+    @Query("""
+            select i from Issue i
+            join fetch i.assignee a
+            where i.project.organization.id = :organizationId and i.status <> :closed and i.project.status <> :archived
+            """)
+    List<Issue> findOpenAssignedByOrganization(@Param("organizationId") UUID organizationId, @Param("closed") IssueStatus closed,
+                                               @Param("archived") ProjectStatus archived);
+
+    @EntityGraph(attributePaths = {"assignee", "assignee.organizationMember", "assignee.organizationMember.user"})
+    List<Issue> findAllByAssigneeId(UUID projectMemberId);
+
+    @EntityGraph(attributePaths = {"assignee", "assignee.organizationMember", "assignee.organizationMember.user"})
+    List<Issue> findAllByAssigneeOrganizationMemberId(UUID organizationMemberId);
 }

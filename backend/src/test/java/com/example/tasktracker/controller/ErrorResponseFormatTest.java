@@ -43,6 +43,15 @@ class ErrorResponseFormatTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void validationMessagesStayEnglishForAnyBrowserLanguage() throws Exception {
+        assertProblem(mockMvc.perform(withToken(post("/organizations"), token)
+                .header("Accept-Language", "ru-RU,ru;q=0.9")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")), 400, "/organizations")
+                .andExpect(jsonPath("$.detail").value("title: must not be blank"));
+    }
+
+    @Test
     void invalidUuidInPathIsProblemDetail() throws Exception {
         assertProblem(mockMvc.perform(withToken(get("/organizations/not-a-uuid"), token)), 400, "/organizations/not-a-uuid");
     }

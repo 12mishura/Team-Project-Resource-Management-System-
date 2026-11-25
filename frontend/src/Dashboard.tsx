@@ -9,8 +9,10 @@ import {
   type OrganizationOverview,
   type Project,
   type ProjectActivity,
+  type TimesheetEntry,
   type User,
 } from './api'
+import { addDays, datesBetween, formatDay, formatHours, startOfWeek, today } from './time'
 import { Avatar, PriorityIcon, StatusBar } from './bits'
 import { describeActivity, formatDate, formatRelative, noun, organizationRoles, plural, priorityRank, statuses, types } from './labels'
 import { useAllRecentProjects } from './recent'
@@ -18,7 +20,12 @@ import { useResource } from './hooks'
 import { ErrorNotice, Loading } from './ui'
 
 type OrganizationData = { organization: Organization; overview: OrganizationOverview; projects: Project[] }
-type HomeData = { issues: Issue[]; organizations: OrganizationData[]; activity: (ProjectActivity & { project: Project })[] }
+type HomeData = {
+  issues: Issue[]
+  organizations: OrganizationData[]
+  activity: (ProjectActivity & { project: Project })[]
+  week: TimesheetEntry[]
+}
 
 const dayFormatter = new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric' })
 
@@ -30,7 +37,9 @@ export function Dashboard({
   openMyIssues,
   openProject,
   openProjectIssue,
+  openTimesheet,
 }: {
+  openTimesheet: () => void
   user?: User
   organizations: Organization[]
   openIssue: (issue: IssueRef) => void
@@ -46,7 +55,8 @@ export function Dashboard({
     useCallback(
       async (signal: AbortSignal): Promise<HomeData> => {
         const ids = key.split(',').filter(Boolean)
-        const [issues, perOrganization] = await Promise.all([
+        const weekStart = startOfWeek(today())
+        const [issues, perOrganization, week] = await Promise.all([
           api.myIssues(signal),
           Promise.all(
             ids.map(async id => {
@@ -54,6 +64,7 @@ export function Dashboard({
               return { id, overview, projects }
             }),
           ),
+          api.timesheet(weekStart, addDays(weekStart, 6), signal).catch(() => [] as TimesheetEntry[]),
         ])
         const orgData = perOrganization.flatMap(({ id, overview, projects }) => {
           const organization = organizations.find(item => item.id === id)
@@ -77,7 +88,7 @@ export function Dashboard({
           .flat()
           .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
           .slice(0, 8)
-        return { issues, organizations: orgData, activity }
+        return { issues, organizations: orgData, activity, week }
       },
       [key, recentKey, organizations],
     ),
@@ -162,6 +173,7 @@ export function Dashboard({
                 ))}
               </div>
               <StatusBar counts={counts} total={issues.length} />
+              <WeekTime entries={data.value.week} openTimesheet={openTimesheet} />
               <div className="panel-heading sub-heading">
                 <h3>In focus</h3>
                 <span className="muted">Open issues by priority</span>
@@ -344,6 +356,34 @@ export function Dashboard({
           )}
         </>
       )}
+    </div>
+  )
+}
+
+function WeekTime({ entries, openTimesheet }: { entries: TimesheetEntry[]; openTimesheet: () => void }) {
+  const start = startOfWeek(today())
+  const days = datesBetween(start, addDays(start, 6))
+  const perDay = days.map(day => entries.filter(entry => entry.workDate === day).reduce((sum, entry) => sum + entry.minutes, 0))
+  const total = perDay.reduce((sum, value) => sum + value, 0)
+  const peak = Math.max(8 * 60, ...perDay)
+  return (
+    <div className="week-time">
+      <div>
+        <span className="muted small-text">Logged this week</span>
+        <strong>{formatHours(total)}</strong>
+      </div>
+      <div className="week-bars" aria-hidden="true">
+        {days.map((day, index) => (
+          <span key={day} title={`${formatDay(day)}: ${formatHours(perDay[index])}`} data-today={day === today() || undefined}>
+            <span style={{ height: `${Math.round((perDay[index] / peak) * 100)}%` }} />
+            <small>{formatDay(day, { weekday: 'narrow' })}</small>
+          </span>
+        ))}
+      </div>
+      <button type="button" className="text-button" onClick={openTimesheet}>
+        Timesheet
+        <ArrowRight size={14} />
+      </button>
     </div>
   )
 }
