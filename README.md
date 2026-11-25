@@ -58,6 +58,10 @@ Requirements: Java 25, Node.js 24, Docker.
    ```
    All demo accounts share the password from `SEED_PASSWORD` (the default is in the script).
 
+## Production
+
+The production stack (PostgreSQL, Spring Boot, Caddy with automatic HTTPS) runs with Docker Compose from `docker-compose.prod.yml`. Step-by-step instructions for AWS EC2, backups and updates are in [`docs/deployment.md`](docs/deployment.md).
+
 ## Tests
 
 ```bash
