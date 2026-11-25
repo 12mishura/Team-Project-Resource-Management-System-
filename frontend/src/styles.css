@@ -115,8 +115,6 @@
   --c114: #f1f5fb;
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
-
 :root {
   font-family: Manrope, 'Segoe UI', sans-serif;
   color: var(--c1);

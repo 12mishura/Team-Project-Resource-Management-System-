@@ -27,7 +27,14 @@ import { Avatar, StatusBar } from './bits'
 import { MetadataFields } from './forms'
 import { noun, organizationRoles, plural, projectStatuses, readMetadata, toOptions } from './labels'
 import { OrganizationPicker } from './OrganizationPicker'
-import { forgetOrganization, forgetProject, readLastOrganization, saveLastOrganization, useRecentProjects } from './recent'
+import {
+  bindRecentToUser,
+  forgetOrganization,
+  forgetProject,
+  readLastOrganization,
+  saveLastOrganization,
+  useRecentProjects,
+} from './recent'
 import { navigate, routePath, useRoute, type Route } from './router'
 import { Select } from './Select'
 import { toggleTheme, useTheme } from './theme'
@@ -87,6 +94,10 @@ type Crumb = { label: string; route?: Route }
 
 function Workspace({ logout, onPasswordChanged }: { logout: () => void; onPasswordChanged: () => void }) {
   const profile = useResource(getProfile)
+  const userId = profile.value?.id
+  useEffect(() => {
+    if (userId) bindRecentToUser(userId)
+  }, [userId])
   const organizations = useResource(api.organizations)
   const route = useRoute()
   const routeOrgId = route.name === 'org' || route.name === 'project' ? route.orgId : ''

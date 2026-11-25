@@ -78,3 +78,16 @@ export function saveLastOrganization(id: string) {
     return
   }
 }
+
+const ownerKey = 'tasktracker.recentOwner'
+
+export function bindRecentToUser(userId: string) {
+  try {
+    if (localStorage.getItem(ownerKey) === userId) return
+    localStorage.setItem(ownerKey, userId)
+    localStorage.removeItem(lastOrgKey)
+  } catch {
+    return
+  }
+  save([])
+}
