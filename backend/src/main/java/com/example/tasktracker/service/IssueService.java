@@ -302,6 +302,13 @@ public class IssueService {
         Issue issue = findIssue(projectId, issueId);
         permissionChecker.checkCanDelete(actor, issue);
 
+        if(issue.getType() == IssueType.EPIC){
+            for(Issue child : issueRepository.findAllByParentId(issue.getId())){
+                child.moveTo(null);
+                historyRecorder.recordChange(child, actor.organizationMember().getUser(), IssueEventType.PARENT_CHANGED,
+                        "parent", issue.getId(), null);
+            }
+        }
         issueRepository.delete(issue);
     }
 
