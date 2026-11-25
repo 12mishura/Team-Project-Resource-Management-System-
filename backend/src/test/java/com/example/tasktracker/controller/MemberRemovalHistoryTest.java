@@ -68,6 +68,31 @@ class MemberRemovalHistoryTest extends AbstractIntegrationTest {
         expectReleasedBy("owner");
     }
 
+    @Test
+    void deletingAnEpicDetachesItsIssuesInHistory() throws Exception {
+        String epicId = read(mockMvc.perform(withToken(post("/organizations/{o}/projects/{p}/issues", organizationId, projectId), ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"EPIC\",\"title\":\"Big epic\"}"))
+                .andExpect(status().isCreated())
+                .andReturn(), "$.id");
+        String childId = read(mockMvc.perform(withToken(post("/organizations/{o}/projects/{p}/issues", organizationId, projectId), ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"TASK\",\"title\":\"Child task\",\"parentId\":\"%s\"}".formatted(epicId)))
+                .andExpect(status().isCreated())
+                .andReturn(), "$.id");
+
+        mockMvc.perform(withToken(delete("/organizations/{o}/projects/{p}/issues/{i}", organizationId, projectId, epicId), ownerToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(withToken(get("/organizations/{o}/projects/{p}/issues/{i}", organizationId, projectId, childId), ownerToken))
+                .andExpect(jsonPath("$.parentId").doesNotExist());
+        mockMvc.perform(withToken(get("/organizations/{o}/projects/{p}/issues/{i}/history", organizationId, projectId, childId), ownerToken))
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.content[1].type").value("PARENT_CHANGED"))
+                .andExpect(jsonPath("$.content[1].oldValue").value(epicId))
+                .andExpect(jsonPath("$.content[1].newValue").value(nullValue()));
+    }
+
     private void expectReleasedBy(String actor) throws Exception {
         mockMvc.perform(withToken(get("/organizations/{o}/projects/{p}/issues/{i}", organizationId, projectId, issueId), ownerToken))
                 .andExpect(status().isOk())

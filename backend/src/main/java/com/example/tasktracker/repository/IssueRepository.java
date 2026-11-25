@@ -72,4 +72,6 @@ public interface IssueRepository extends JpaRepository<Issue, UUID>, JpaSpecific
 
     @EntityGraph(attributePaths = {"assignee", "assignee.organizationMember", "assignee.organizationMember.user"})
     List<Issue> findAllByAssigneeOrganizationMemberId(UUID organizationMemberId);
+
+    List<Issue> findAllByParentId(UUID parentId);
 }

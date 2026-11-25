@@ -245,6 +245,17 @@ function friendlyNotFound(detail: string) {
   return match ? `This ${match[1].toLowerCase()} does not exist or was deleted.` : detail
 }
 
+function friendlyConflict(detail: string) {
+  return /^Project \S+ is archived and read-only$/.test(detail) ? 'This project is archived and read-only.' : detail
+}
+
+function friendlyMessage(status: number, detail: string) {
+  if (status === 403) return friendlyForbidden(detail)
+  if (status === 404) return friendlyNotFound(detail)
+  if (status === 409) return friendlyConflict(detail)
+  return detail
+}
+
 async function send<T>(path: string, options: RequestOptions = {}, token?: string): Promise<T> {
   const { method = 'GET', body, signal } = options
   const headers = new Headers({ Accept: 'application/json, application/problem+json', 'Accept-Language': 'en' })
@@ -259,12 +270,14 @@ async function send<T>(path: string, options: RequestOptions = {}, token?: strin
   })
   if (!response.ok) {
     const problem = await response.json().catch(() => null)
-    const fallback = response.status === 403 ? 'You don’t have access to this section.' : `API error (${response.status}).`
+    const fallback =
+      response.status === 403
+        ? 'You don’t have access to this section.'
+        : response.status >= 502 && response.status <= 504
+          ? 'The server is not reachable right now. Please try again in a moment.'
+          : `API error (${response.status}).`
     const detail = typeof problem?.detail === 'string' ? problem.detail : fallback
-    throw new ApiError(
-      response.status,
-      response.status === 403 ? friendlyForbidden(detail) : response.status === 404 ? friendlyNotFound(detail) : detail,
-    )
+    throw new ApiError(response.status, friendlyMessage(response.status, detail))
   }
   return response.status === 204 ? (undefined as T) : response.json()
 }

@@ -64,6 +64,12 @@ describe('api client', () => {
     fetchMock.mockResolvedValueOnce(json(404, { detail: 'Issue with ID 1234 not found' }))
     await expect(api.organization('org')).rejects.toThrow('This issue does not exist or was deleted.')
 
+    fetchMock.mockResolvedValueOnce(json(409, { detail: 'Project 1234-abcd is archived and read-only' }))
+    await expect(api.organization('org')).rejects.toThrow('This project is archived and read-only.')
+
+    fetchMock.mockResolvedValueOnce(new Response('Bad gateway', { status: 502 }))
+    await expect(api.organization('org')).rejects.toThrow('The server is not reachable right now. Please try again in a moment.')
+
     fetchMock.mockResolvedValueOnce(json(403, { detail: 'Only OWNER can transfer ownership' }))
     await expect(api.organization('org')).rejects.toThrow('Only OWNER can transfer ownership')
   })
