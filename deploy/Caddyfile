@@ -1,0 +1,28 @@
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		@pages not path /assets/*
+		header @pages Cache-Control "no-cache"
+
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

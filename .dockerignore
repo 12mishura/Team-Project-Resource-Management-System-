@@ -1,0 +1,12 @@
+.git
+.idea
+**/node_modules
+**/dist
+**/target
+frontend/playwright-report
+frontend/test-results
+backend
+docs
+scripts
+.env
+.env.*
