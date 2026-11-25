@@ -19,7 +19,8 @@ public record CreateIssueRequest(
         BugSeverity severity,
         @Size(max = 5000) String stepsToReproduce,
         @Min(0) @Max(100) Integer storyPoints,
-        UUID parentId
+        UUID parentId,
+        UUID assigneeId
 ) {
     public CreateIssueRequest {
         title = title == null ? null : title.strip();

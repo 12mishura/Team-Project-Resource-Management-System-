@@ -171,7 +171,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         ProjectResponse created = as(OWNER, () -> projectService.createProject(organizationId, request("Backend Rewrite")));
 
         ProjectResponse updated = as(OWNER, () -> projectService.updateProject(organizationId, created.id(),
-                new UpdateProjectRequest("Frontend Rewrite", "New description")));
+                new UpdateProjectRequest("Frontend Rewrite", "New description"), OWNER));
 
         assertThat(updated.title()).isEqualTo("Frontend Rewrite");
         assertThat(updated.description()).isEqualTo("New description");
@@ -182,7 +182,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
     void adminCanUpdateProject() {
         UUID projectId = as(OWNER, () -> projectService.createProject(organizationId, request("Backend Rewrite"))).id();
 
-        assertThat(as(ADMIN, () -> projectService.updateProject(organizationId, projectId, new UpdateProjectRequest(null, "By admin")))
+        assertThat(as(ADMIN, () -> projectService.updateProject(organizationId, projectId, new UpdateProjectRequest(null, "By admin"), ADMIN))
                 .description()).isEqualTo("By admin");
     }
 
@@ -191,7 +191,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID projectId = as(OWNER, () -> projectService.createProject(organizationId, request("Backend Rewrite"))).id();
 
         ProjectResponse updated = as(OWNER, () -> projectService.updateProject(organizationId, projectId,
-                new UpdateProjectRequest(null, "Only description")));
+                new UpdateProjectRequest(null, "Only description"), OWNER));
 
         assertThat(updated.title()).isEqualTo("Backend Rewrite");
     }
@@ -201,7 +201,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID projectId = as(OWNER, () -> projectService.createProject(organizationId, request("Backend Rewrite"))).id();
 
         assertThatThrownBy(() -> as(USER, () -> projectService.updateProject(organizationId, projectId,
-                new UpdateProjectRequest("Hacked Project", null))))
+                new UpdateProjectRequest("Hacked Project", null), USER)))
                 .isInstanceOf(IllegalMemberOperationException.class);
     }
 
@@ -210,7 +210,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID projectId = as(OWNER, () -> projectService.createProject(organizationId, request("Backend Rewrite"))).id();
 
         assertThatThrownBy(() -> as(OUTSIDER, () -> projectService.updateProject(organizationId, projectId,
-                new UpdateProjectRequest("Hacked Project", null))))
+                new UpdateProjectRequest("Hacked Project", null), OUTSIDER)))
                 .isInstanceOf(AccessDeniedToOrganizationException.class);
     }
 
@@ -219,7 +219,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID unknown = UUID.randomUUID();
 
         assertThatThrownBy(() -> as(OWNER, () -> projectService.updateProject(organizationId, unknown,
-                new UpdateProjectRequest("Whatever Title", null))))
+                new UpdateProjectRequest("Whatever Title", null), OWNER)))
                 .isInstanceOf(ProjectNotFoundException.class)
                 .hasMessage("Project with ID " + unknown + " not found");
     }
@@ -231,7 +231,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID foreignProject = as(OUTSIDER, () -> projectService.createProject(otherOrganization, request("Foreign Project"))).id();
 
         assertThatThrownBy(() -> as(OWNER, () -> projectService.updateProject(organizationId, foreignProject,
-                new UpdateProjectRequest("Stolen Project", null))))
+                new UpdateProjectRequest("Stolen Project", null), OWNER)))
                 .isInstanceOf(ProjectNotFoundException.class);
     }
 
@@ -241,7 +241,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID projectId = as(OWNER, () -> projectService.createProject(organizationId, request("Frontend Rewrite"))).id();
 
         assertThatThrownBy(() -> as(OWNER, () -> projectService.updateProject(organizationId, projectId,
-                new UpdateProjectRequest("backend rewrite", null))))
+                new UpdateProjectRequest("backend rewrite", null), OWNER)))
                 .isInstanceOf(DuplicateProjectTitleException.class);
     }
 
@@ -250,7 +250,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID projectId = as(OWNER, () -> projectService.createProject(organizationId, request("Backend Rewrite"))).id();
 
         assertThat(as(OWNER, () -> projectService.updateProject(organizationId, projectId,
-                new UpdateProjectRequest("BACKEND REWRITE", null))).title()).isEqualTo("BACKEND REWRITE");
+                new UpdateProjectRequest("BACKEND REWRITE", null), OWNER)).title()).isEqualTo("BACKEND REWRITE");
     }
 
     private UUID otherOrganizationId() {
@@ -310,7 +310,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
     void listCanBeFilteredByStatus() {
         UUID finished = as(OWNER, () -> projectService.createProject(organizationId, request("Finished Project"))).id();
         as(OWNER, () -> projectService.createProject(organizationId, request("Active Project")));
-        as(OWNER, () -> projectService.changeStatus(organizationId, finished, new ChangeProjectStatusRequest(ProjectStatus.FINISHED)));
+        as(OWNER, () -> projectService.changeStatus(organizationId, finished, new ChangeProjectStatusRequest(ProjectStatus.FINISHED), OWNER));
 
         assertThat(as(USER, () -> projectService.getProjects(organizationId, ProjectStatus.FINISHED, FIRST_PAGE)).content())
                 .extracting(ProjectResponse::title).containsExactly("Finished Project");
@@ -330,7 +330,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID projectId = as(OWNER, () -> projectService.createProject(organizationId, request("Backend Rewrite"))).id();
 
         ProjectResponse archived = as(ADMIN, () -> projectService.changeStatus(organizationId, projectId,
-                new ChangeProjectStatusRequest(ProjectStatus.ARCHIVED)));
+                new ChangeProjectStatusRequest(ProjectStatus.ARCHIVED), ADMIN));
 
         assertThat(archived.status()).isEqualTo(ProjectStatus.ARCHIVED);
         assertThat(as(OWNER, () -> projectService.getProject(organizationId, projectId)).status()).isEqualTo(ProjectStatus.ARCHIVED);
@@ -341,7 +341,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID projectId = as(OWNER, () -> projectService.createProject(organizationId, request("Backend Rewrite"))).id();
 
         assertThatThrownBy(() -> as(OWNER, () -> projectService.changeStatus(organizationId, projectId,
-                new ChangeProjectStatusRequest(ProjectStatus.ACTIVE))))
+                new ChangeProjectStatusRequest(ProjectStatus.ACTIVE), OWNER)))
                 .isInstanceOf(ProjectStatusAlreadyAssignedException.class)
                 .hasMessage("Project already has status ACTIVE");
     }
@@ -351,7 +351,7 @@ class ProjectServiceTest extends AbstractIntegrationTest {
         UUID projectId = as(OWNER, () -> projectService.createProject(organizationId, request("Backend Rewrite"))).id();
 
         assertThatThrownBy(() -> as(USER, () -> projectService.changeStatus(organizationId, projectId,
-                new ChangeProjectStatusRequest(ProjectStatus.FINISHED))))
+                new ChangeProjectStatusRequest(ProjectStatus.FINISHED), USER)))
                 .isInstanceOf(IllegalMemberOperationException.class);
         assertThat(as(OWNER, () -> projectService.getProject(organizationId, projectId)).status()).isEqualTo(ProjectStatus.ACTIVE);
     }

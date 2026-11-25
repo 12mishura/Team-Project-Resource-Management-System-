@@ -19,6 +19,8 @@ import com.example.tasktracker.dto.request.UpdateIssueRequest;
 import com.example.tasktracker.dto.response.IssueEventResponse;
 import com.example.tasktracker.dto.response.IssueResponse;
 import com.example.tasktracker.dto.response.PageResponse;
+import com.example.tasktracker.dto.response.ProjectActivityResponse;
+import com.example.tasktracker.exception.IllegalIssueOperationException;
 import com.example.tasktracker.exception.InvalidIssueException;
 import com.example.tasktracker.exception.IssueNotFoundException;
 import com.example.tasktracker.exception.ProjectArchivedException;
@@ -85,8 +87,17 @@ public class IssueService {
         if(request.parentId() != null){
             issue.moveTo(findIssue(projectId, request.parentId()));
         }
+        if(request.assigneeId() != null){
+            ProjectMember assignee = projectMemberRepository.findByIdAndProjectId(request.assigneeId(), projectId)
+                    .orElseThrow(() -> new ProjectMemberNotFoundException(request.assigneeId()));
+            permissionChecker.checkCanAssign(actor, issue, assignee);
+            issue.setAssignee(assignee);
+        }
+
         issueRepository.saveAndFlush(issue);
         historyRecorder.recordCreated(issue, actor.organizationMember().getUser());
+        historyRecorder.recordChange(issue, actor.organizationMember().getUser(), IssueEventType.ASSIGNEE_CHANGED,
+                "assignee", null, assigneeName(issue));
         return issueMapper.toResponse(issue);
     }
 
@@ -100,6 +111,17 @@ public class IssueService {
         return PageResponse.from(
                 eventRepository.findAllByIssueId(issueId, PageRequests.byCreation(pageable)),
                 eventMapper::toResponse);
+    }
+
+    @OrganizationAccess
+    @Transactional(readOnly = true)
+    public PageResponse<ProjectActivityResponse> getProjectActivity(@OrganizationId UUID organizationId, UUID projectId,
+                                                                    Pageable pageable, String email){
+        findProject(organizationId, projectId);
+        permissionChecker.requireProjectActor(organizationId, projectId, email);
+        return PageResponse.from(
+                eventRepository.findAllByIssueProjectId(projectId, PageRequests.newestFirst(pageable)),
+                eventMapper::toActivityResponse);
     }
 
     @OrganizationAccess
@@ -205,6 +227,22 @@ public class IssueService {
 
     @OrganizationAccess
     @Transactional
+    public IssueResponse assignToMe(@OrganizationId UUID organizationId, UUID projectId, UUID issueId, String email){
+        Project project = findProject(organizationId, projectId);
+        ProjectActor actor = permissionChecker.requireProjectActor(organizationId, projectId, email);
+        requireNotArchived(project);
+        Issue issue = findIssue(projectId, issueId);
+
+        String oldAssignee = assigneeName(issue);
+        issue.setAssignee(selfAsAssignee(actor, issue));
+        issueRepository.flush();
+        historyRecorder.recordChange(issue, actor.organizationMember().getUser(), IssueEventType.ASSIGNEE_CHANGED,
+                "assignee", oldAssignee, assigneeName(issue));
+        return issueMapper.toResponse(issue);
+    }
+
+    @OrganizationAccess
+    @Transactional
     public IssueResponse unassignIssue(@OrganizationId UUID organizationId, UUID projectId, UUID issueId, String email){
         Project project = findProject(organizationId, projectId);
         ProjectActor actor = permissionChecker.requireProjectActor(organizationId, projectId, email);
@@ -265,6 +303,14 @@ public class IssueService {
         permissionChecker.checkCanDelete(actor, issue);
 
         issueRepository.delete(issue);
+    }
+
+    private ProjectMember selfAsAssignee(ProjectActor actor, Issue issue){
+        if(actor.projectMember() == null){
+            throw new IllegalIssueOperationException("Add yourself to the project before assigning issues to yourself");
+        }
+        permissionChecker.checkCanAssign(actor, issue, actor.projectMember());
+        return actor.projectMember();
     }
 
     private static String assigneeName(Issue issue){

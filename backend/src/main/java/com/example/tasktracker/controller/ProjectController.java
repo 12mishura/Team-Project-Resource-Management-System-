@@ -11,6 +11,8 @@ import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -42,15 +44,17 @@ public class ProjectController {
     @PatchMapping("/{projectId}")
     public ProjectResponse updateProject(@PathVariable UUID organizationId,
                                          @PathVariable UUID projectId,
-                                         @Valid @RequestBody UpdateProjectRequest request){
-        return projectService.updateProject(organizationId, projectId, request);
+                                         @Valid @RequestBody UpdateProjectRequest request,
+                                         @AuthenticationPrincipal UserDetails userDetails){
+        return projectService.updateProject(organizationId, projectId, request, userDetails.getUsername());
     }
 
     @PatchMapping("/{projectId}/status")
     public ProjectResponse changeStatus(@PathVariable UUID organizationId,
                                         @PathVariable UUID projectId,
-                                        @Valid @RequestBody ChangeProjectStatusRequest request){
-        return projectService.changeStatus(organizationId, projectId, request);
+                                        @Valid @RequestBody ChangeProjectStatusRequest request,
+                                        @AuthenticationPrincipal UserDetails userDetails){
+        return projectService.changeStatus(organizationId, projectId, request, userDetails.getUsername());
     }
 
     @DeleteMapping("/{projectId}")

@@ -234,6 +234,32 @@ class IssueControllerTest extends AbstractIntegrationTest {
             getOne(userToken, issueId).andExpect(status().isOk());
             list(userToken, "").andExpect(jsonPath("$.content", hasSize(1)));
         }
+
+        @Test
+        void extendedMemberAssignsAnyProjectMemberOnCreate() throws Exception {
+            create(extendedToken, issue("TASK", "Prepare release", ",\"assigneeId\":\"%s\"".formatted(userProjectMemberId)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.assigneeId").value(userProjectMemberId))
+                    .andExpect(jsonPath("$.assigneeUsername").value("member"));
+        }
+
+        @Test
+        void projectUserCanOnlyAssignThemselvesOnCreate() throws Exception {
+            create(userToken, issue("TASK", "Take it myself", ",\"assigneeId\":\"%s\"".formatted(userProjectMemberId)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.assigneeId").value(userProjectMemberId));
+            create(userToken, issue("TASK", "Give it away", ",\"assigneeId\":\"%s\"".formatted(secondUserProjectMemberId)))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.detail").value("Project USER can only take a free issue or release their own"));
+            assertThat(issueCount()).isEqualTo(1);
+        }
+
+        @Test
+        void assigneeFromAnotherProjectIsRejectedOnCreate() throws Exception {
+            create(ownerToken, issue("TASK", "Wrong project", ",\"assigneeId\":\"%s\"".formatted(otherProjectMemberId)))
+                    .andExpect(status().isNotFound());
+            assertThat(issueCount()).isZero();
+        }
     }
 
     @Nested
@@ -501,6 +527,45 @@ class IssueControllerTest extends AbstractIntegrationTest {
             assign(ownerToken, issueId, userMemberId).andExpect(status().isNotFound());
             assign(ownerToken, issueId, UUID.randomUUID().toString()).andExpect(status().isNotFound());
         }
+
+        @Test
+        void anyProjectMemberAssignsFreeIssueToSelf() throws Exception {
+            String issueId = createId(extendedToken, issue("TASK", "Free task", ""));
+
+            assignToMe(userToken, issueId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.assigneeId").value(userProjectMemberId))
+                    .andExpect(jsonPath("$.assigneeUsername").value("member"));
+        }
+
+        @Test
+        void userCannotTakeIssueAssignedToSomeoneElseButExtendedCan() throws Exception {
+            String issueId = createId(extendedToken, issue("TASK", "Taken task", ""));
+            assign(extendedToken, issueId, secondUserProjectMemberId).andExpect(status().isOk());
+
+            assignToMe(userToken, issueId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.detail").value("Project USER can only take a free issue or release their own"));
+            assignToMe(extendedToken, issueId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.assigneeId").value(extendedProjectMemberId));
+        }
+
+        @Test
+        void organizationOwnerMustJoinProjectBeforeAssigningSelf() throws Exception {
+            String issueId = createId(extendedToken, issue("TASK", "Owner task", ""));
+
+            assignToMe(ownerToken, issueId)
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.detail").value("Add yourself to the project before assigning issues to yourself"));
+
+            String ownerMemberId = read(mockMvc.perform(withToken(get("/organizations"), ownerToken)).andReturn(), "$.content[0].memberId");
+            String ownerProjectMemberId = addToProject(projectId, ownerMemberId, "ADMIN");
+            assignToMe(ownerToken, issueId)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.assigneeId").value(ownerProjectMemberId))
+                    .andExpect(jsonPath("$.assigneeUsername").value("owner"));
+        }
     }
 
     @Nested
@@ -764,6 +829,10 @@ class IssueControllerTest extends AbstractIntegrationTest {
             return mockMvc.perform(withToken(delete(issuesPath(projectId) + "/" + issueId + "/assignee"), token));
         }
         return patchRaw(token, issueId, "/assignee", "{\"projectMemberId\":\"%s\"}".formatted(projectMemberId));
+    }
+
+    private ResultActions assignToMe(String token, String issueId) throws Exception {
+        return mockMvc.perform(withToken(patch(issuesPath(projectId) + "/" + issueId + "/assignee/me"), token));
     }
 
     private ResultActions changeParent(String token, String issueId, String parentId) throws Exception {

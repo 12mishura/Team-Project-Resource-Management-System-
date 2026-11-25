@@ -10,6 +10,7 @@ import com.example.tasktracker.domain.enums.ProjectMemberRole;
 import com.example.tasktracker.exception.AccessDeniedToOrganizationException;
 import com.example.tasktracker.exception.AccessDeniedToProjectException;
 import com.example.tasktracker.exception.IllegalIssueOperationException;
+import com.example.tasktracker.exception.IllegalMemberOperationException;
 import com.example.tasktracker.repository.OrganizationMemberRepository;
 import com.example.tasktracker.repository.ProjectMemberRepository;
 import lombok.AllArgsConstructor;
@@ -20,6 +21,8 @@ import java.util.UUID;
 @Component
 @AllArgsConstructor
 public class ProjectPermissionChecker {
+    private static final String MANAGE_PROJECT_DENIED = "Only organization OWNER or ADMIN or project ADMIN can manage this project";
+
     private final OrganizationMemberRepository organizationMemberRepository;
     private final ProjectMemberRepository projectMemberRepository;
 
@@ -37,6 +40,29 @@ public class ProjectPermissionChecker {
             throw new AccessDeniedToProjectException(projectId);
         }
         return new ProjectActor(organizationMember, projectMember, projectMember.getRole());
+    }
+
+    public ProjectActor requireProjectAdmin(UUID organizationId, UUID projectId, String email){
+        OrganizationMember organizationMember = organizationMemberRepository.findByOrganizationIdAndUserEmail(organizationId, email)
+                .orElseThrow(() -> new AccessDeniedToOrganizationException(organizationId));
+        ProjectMember projectMember = projectMemberRepository
+                .findByProjectIdAndOrganizationMemberId(projectId, organizationMember.getId())
+                .orElse(null);
+
+        if(organizationMember.getRole() == OrganizationRole.OWNER || organizationMember.getRole() == OrganizationRole.ADMIN){
+            return new ProjectActor(organizationMember, projectMember, ProjectMemberRole.ADMIN);
+        }
+        if(projectMember == null || projectMember.getRole() != ProjectMemberRole.ADMIN){
+            throw new IllegalMemberOperationException(MANAGE_PROJECT_DENIED);
+        }
+        return new ProjectActor(organizationMember, projectMember, ProjectMemberRole.ADMIN);
+    }
+
+    public void checkCanChangeMembership(ProjectActor actor, ProjectMember target){
+        boolean organizationManager = actor.organizationMember().getRole() != OrganizationRole.USER;
+        if(!organizationManager && actor.is(target)){
+            throw new IllegalMemberOperationException("Project ADMIN cannot change their own membership");
+        }
     }
 
     public void checkCanCreate(ProjectActor actor, IssueType type){

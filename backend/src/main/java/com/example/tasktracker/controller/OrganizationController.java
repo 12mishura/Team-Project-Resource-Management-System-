@@ -4,8 +4,10 @@ import com.example.tasktracker.dto.request.CreateOrganizationRequest;
 import com.example.tasktracker.dto.request.UpdateOrganizationRequest;
 import com.example.tasktracker.dto.response.InviteCodeResponse;
 import com.example.tasktracker.dto.response.MyOrganizationResponse;
+import com.example.tasktracker.dto.response.OrganizationOverviewResponse;
 import com.example.tasktracker.dto.response.OrganizationResponse;
 import com.example.tasktracker.dto.response.PageResponse;
+import com.example.tasktracker.service.OrganizationOverviewService;
 import com.example.tasktracker.service.OrganizationService;
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
@@ -22,6 +24,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class OrganizationController {
     private final OrganizationService organizationService;
+    private final OrganizationOverviewService organizationOverviewService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -38,6 +41,11 @@ public class OrganizationController {
     @GetMapping("/{id}")
     public OrganizationResponse getOrganizationById(@PathVariable UUID id){
         return organizationService.getOrganizationById(id);
+    }
+
+    @GetMapping("/{id}/overview")
+    public OrganizationOverviewResponse getOverview(@PathVariable UUID id, @AuthenticationPrincipal UserDetails userDetails){
+        return organizationOverviewService.getOverview(id, userDetails.getUsername());
     }
 
     @GetMapping("/{id}/invite-code")

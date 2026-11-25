@@ -83,7 +83,7 @@ class ProjectMemberControllerTest extends AbstractIntegrationTest {
     void regularMemberCannotAddMembers() throws Exception {
         add(userToken, projectId, adminMemberId, "USER")
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.detail").value("Only OWNER or ADMIN can perform this operation"));
+                .andExpect(jsonPath("$.detail").value("Only organization OWNER or ADMIN or project ADMIN can manage this project"));
     }
 
     @Test
