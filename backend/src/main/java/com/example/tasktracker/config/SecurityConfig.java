@@ -1,8 +1,10 @@
 package com.example.tasktracker.config;
 
+import com.example.tasktracker.security.AuthRateLimitFilter;
 import com.example.tasktracker.security.AuthTokenFilter;
 import com.example.tasktracker.security.JwtAuthenticationEntryPoint;
 import com.example.tasktracker.security.JwtProperties;
+import com.example.tasktracker.security.RateLimitProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -19,13 +21,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+import java.time.Clock;
+
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, RateLimitProperties.class})
 @RequiredArgsConstructor
 public class SecurityConfig {
     private final AuthTokenFilter authTokenFilter;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
+    private final RateLimitProperties rateLimitProperties;
+    private final Clock clock;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -53,8 +59,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/register", "/auth/login", "/auth/refresh", "/auth/logout", "/error").permitAll()
+                        .requestMatchers("/auth/register", "/auth/login", "/auth/refresh", "/auth/logout", "/error",
+                                "/actuator/health", "/actuator/health/**").permitAll()
                         .anyRequest().authenticated())
+                .addFilterBefore(new AuthRateLimitFilter(rateLimitProperties, clock), UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
